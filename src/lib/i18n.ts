@@ -13,9 +13,7 @@ export type Entry =
 export type Table = Record<string, Entry>;
 
 /** Stable English only. */
-export const LANGUAGES: Array<[Language, string]> = [
-	["en", "English"],
-];
+export const LANGUAGES: Array<[Language, string]> = [["en", "English"]];
 
 export async function loadLanguage(_lang: Language): Promise<void> {
 	// English is built-in

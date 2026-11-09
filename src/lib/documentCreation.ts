@@ -4,11 +4,13 @@
  * Excel (.xlsx), and PowerPoint (.pptx) documents.
  */
 import { PDFDocument, StandardFonts, rgb } from "@cantoo/pdf-lib";
-import { zipSync, strToU8 } from "fflate";
+import { strToU8, zipSync } from "fflate";
 import * as XLSX from "xlsx";
 
 /** Create a new blank PDF document */
-export async function createNewPdf(title = "Untitled Document"): Promise<Uint8Array> {
+export async function createNewPdf(
+	title = "Untitled Document",
+): Promise<Uint8Array> {
 	const doc = await PDFDocument.create();
 	const page = doc.addPage([595.28, 841.89]); // A4
 	const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -91,7 +93,9 @@ export function createNewWorkbook(sheetName = "Sheet1"): Uint8Array {
 }
 
 /** Create a new PowerPoint (.pptx) presentation */
-export function createNewPresentation(title = "Untitled Presentation"): Uint8Array {
+export function createNewPresentation(
+	title = "Untitled Presentation",
+): Uint8Array {
 	const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"

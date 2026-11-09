@@ -4,6 +4,12 @@ import {
 	formatBytes,
 	requestForBytes,
 } from "@/lib/backend";
+import {
+	createNewPdf,
+	createNewPresentation,
+	createNewWordDoc,
+	createNewWorkbook,
+} from "@/lib/documentCreation";
 import { isDesktop } from "@/lib/env";
 import { type FormatKind, kindOf } from "@/lib/formats";
 import { compareNames, formatDate, isolate, locale, msg, t } from "@/lib/i18n";
@@ -14,12 +20,6 @@ import type { OpenRequest, RecentEntry } from "@/lib/types";
 import type { ToolId } from "@/screens/tools/ToolsScreen";
 import { FileDetails, HandOffItems } from "@/screens/viewer/FileMenu";
 import { RenameDialog } from "@/screens/viewer/RenameDialog";
-import {
-	createNewPdf,
-	createNewPresentation,
-	createNewWordDoc,
-	createNewWorkbook,
-} from "@/lib/documentCreation";
 import { MAX_FOLDERS, useFolders } from "@/state/folders";
 import { useRecents } from "@/state/recents";
 import {
@@ -38,6 +38,9 @@ import {
 	BookOpen,
 	Check,
 	Combine,
+	FilePlus2,
+	FileSpreadsheet,
+	FileText,
 	Folder as FolderIcon,
 	FolderPlus,
 	Highlighter,
@@ -49,14 +52,11 @@ import {
 	Pin,
 	PinOff,
 	Plus,
+	Presentation,
 	ScanLine,
 	SearchX,
 	Settings as SettingsIcon,
 	ShieldCheck,
-	FileText,
-	FileSpreadsheet,
-	Presentation,
-	FilePlus2,
 	Trash2,
 } from "lucide-react";
 import {

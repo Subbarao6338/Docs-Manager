@@ -97,19 +97,9 @@ export function markHit(
 			v <= mark.y + mark.h + y
 		);
 	}
-	if (mark.kind === "image") {
-		const x = reach / pw;
-		const y = reach / ph;
-		return (
-			u >= mark.x - x &&
-			u <= mark.x + mark.w + x &&
-			v >= mark.y - y &&
-			v <= mark.y + mark.h + y
-		);
-	}
 	const x = reach / pw;
 	const y = reach / ph;
-	return "boxes" in mark && mark.boxes.some(
+	return mark.boxes.some(
 		(b) =>
 			u >= b.x - x && u <= b.x + b.w + x && v >= b.y - y && v <= b.y + b.h + y,
 	);

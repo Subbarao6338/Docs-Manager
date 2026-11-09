@@ -63,20 +63,6 @@ export type Markup =
 			size: number;
 			text: string;
 			color: string;
-			bold?: boolean;
-			italic?: boolean;
-			align?: "left" | "center" | "right";
-			fontFamily?: string;
-	  }
-	| {
-			kind: "image";
-			page: number;
-			x: number;
-			y: number;
-			w: number;
-			h: number;
-			dataUrl: string;
-			opacity?: number;
 	  }
 	| {
 			kind: "measure";
@@ -458,24 +444,6 @@ export async function addMarkup(
 			await addTextBox(doc, page, mark, pictures?.[box++]);
 		else if (mark.kind === "measure")
 			await addMeasure(doc, page, mark, labels?.[measure++]);
-		else if (mark.kind === "image") {
-			// Embedded as an image on page
-			try {
-				const imgBytes = await (await fetch(mark.dataUrl)).arrayBuffer();
-				const embedded = mark.dataUrl.startsWith("data:image/png")
-					? await doc.embedPng(imgBytes)
-					: await doc.embedJpg(imgBytes);
-				const box = shownBox(page);
-				const pt = pagePoint(box, mark.x, mark.y + mark.h);
-				page.drawImage(embedded, {
-					x: pt[0],
-					y: pt[1],
-					width: mark.w * box.width,
-					height: mark.h * box.height,
-					opacity: mark.opacity ?? 1,
-				});
-			} catch {}
-		}
 		else await addTextMark(doc, page, mark);
 	}
 	return doc.save({ updateFieldAppearances: false });

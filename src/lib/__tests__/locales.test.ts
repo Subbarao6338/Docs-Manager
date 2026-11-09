@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatBytes } from "../backend";
-import {
-	LANGUAGES,
-	isRtl,
-	resolveLanguage,
-	t,
-	tn,
-} from "../i18n";
+import { LANGUAGES, isRtl, resolveLanguage, t, tn } from "../i18n";
 
 describe("stable English translations", () => {
 	it("offers only English", () => {

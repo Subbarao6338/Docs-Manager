@@ -91,7 +91,7 @@ function MarkCard({
 	const note = useDraft(noted ? (mark.note ?? "") : "", (text) =>
 		onNote(mark, text.trim()),
 	);
-	const color = mark.kind === "note" ? "#ffd93b" : "color" in mark ? mark.color : "#4a90e2";
+	const color = mark.kind === "note" ? "#ffd93b" : mark.color;
 	return (
 		<li
 			className={s.markCard}
