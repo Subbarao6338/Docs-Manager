@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const ACTIVITY_SRC = "src-tauri/android/MainActivity.kt";
 const GEN = "src-tauri/gen/android/app/src/main";
-const ACTIVITY_DEST = `${GEN}/java/app/paperwren/docs/MainActivity.kt`;
+const ACTIVITY_DEST = `${GEN}/java/sark/docs/MainActivity.kt`;
 const MANIFEST = `${GEN}/AndroidManifest.xml`;
 const PROVIDER_PATHS = `${GEN}/res/xml/paperwren_files.xml`;
 
@@ -188,7 +188,7 @@ function balanced(src) {
 
 function validateActivity(src) {
 	const required = [
-		"package app.paperwren.docs",
+		"package sark.docs",
 		"class MainActivity : TauriActivity()",
 		"override fun onCreate(savedInstanceState: Bundle?)",
 		"super.onCreate(savedInstanceState)",

@@ -1,5 +1,5 @@
 import { backend, requestForManagedCopy } from "@/lib/backend";
-import { isDesktop, isMac, isTauri, sharesFrame } from "@/lib/env";
+import { isDesktop, isMac, isTauri } from "@/lib/env";
 import { toggleFullscreen, watchFullscreen } from "@/lib/fullscreen";
 import { language, subscribe, t } from "@/lib/i18n";
 import { isFullscreenKey } from "@/lib/keys";
@@ -84,7 +84,7 @@ declare global {
 function Root() {
 	// Every screen is drawn from here, so a change of language redraws
 	// them all.
-	const lang = useSyncExternalStore(subscribe, language);
+	useSyncExternalStore(subscribe, language);
 	const { state, push, replace, back, close, reset } = useNav();
 	const { entries, remove, ready: recentsReady } = useRecents();
 	const { settings, ready: settingsReady } = useSettings();
@@ -420,27 +420,6 @@ function Root() {
 	// loads the code for it.
 	const screensRef = useRef(state.screens);
 	screensRef.current = state.screens;
-	// biome-ignore lint/correctness/useExhaustiveDependencies: built again when the language changes
-	useEffect(() => {
-		if (!isTauri || !sharesFrame) return;
-		import("@/lib/macMenu")
-			.then(({ installMenu }) =>
-				installMenu({
-					settings: () => {
-						if (!screensRef.current.some((s) => s.kind === "settings"))
-							push({ kind: "settings" });
-					},
-				}),
-			)
-			.catch(() => {});
-	}, [lang, push]);
-	const viewing = state.screens[state.screens.length - 1]?.kind === "viewer";
-	useEffect(() => {
-		if (!isTauri || !sharesFrame) return;
-		import("@/lib/macMenu")
-			.then(({ setMenuViewing }) => setMenuViewing(viewing))
-			.catch(() => {});
-	}, [viewing]);
 
 	// Android: the shell cannot translate, so a hand-off that fails there
 	// is said here.

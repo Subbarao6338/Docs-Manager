@@ -10,7 +10,7 @@ import type { Language } from "./i18n";
 import type { ReadWord } from "./pdfTools";
 
 /** Tesseract's name for each language the app speaks. */
-export const OCR_NAMES: Record<Language, string> = {
+export const OCR_NAMES: Record<string, string> = {
 	en: "eng",
 	ur: "urd",
 	ar: "ara",

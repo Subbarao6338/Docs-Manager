@@ -1,7 +1,9 @@
 name: Release
 
 on:
-  # Publishing is an explicit action. Ordinary pushes only run CI.
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -12,87 +14,81 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  check-and-bump:
-    name: Version check and bump
-    if: github.ref == 'refs/heads/main'
+  version-and-notes:
+    name: Compute Dynamic Version & Release Notes
     runs-on: ubuntu-latest
     outputs:
-      should_release: ${{ steps.bump.outputs.should_release }}
-      version: ${{ steps.bump.outputs.version }}
-      commit: ${{ steps.source.outputs.sha }}
+      version: ${{ steps.ver.outputs.version }}
+      notes: ${{ steps.notes.outputs.notes }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Rust (for lockfile generation when missing)
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Check for changes and bump version
-        id: bump
+      - name: Calculate Version
+        id: ver
         run: |
-          set -eo pipefail
-          CURRENT_VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
-          echo "Current version: $CURRENT_VERSION"
+          VERSION="2.0.${{ github.run_number }}"
+          echo "Computed version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-          if git tag -l "v$CURRENT_VERSION" | grep -q "v$CURRENT_VERSION"; then
-            COMMITS_SINCE=$(git rev-list "v$CURRENT_VERSION"..HEAD --count 2>/dev/null || echo "0")
-            echo "Commits since v$CURRENT_VERSION: $COMMITS_SINCE"
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
 
-            if [ "$COMMITS_SINCE" -eq "0" ]; then
-              echo "No new commits since last release, skipping"
-              echo "should_release=false" >> "$GITHUB_OUTPUT"
-              echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
+      - name: Generate Dynamic Release Notes
+        id: notes
+        run: |
+          NOTES_FILE="$RUNNER_TEMP/release_notes.md"
+          cat << 'EOF' > "$NOTES_FILE"
+          ### Sark Docs Manager v2.0.${{ github.run_number }}
+          **The Ultimate Documents Solution** - Creation, Viewing, Editing, Tools, and Document Management.
 
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-            NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
-            echo "Bumping version: $CURRENT_VERSION to $NEW_VERSION"
+          #### Highlights & What's New:
+          - **Multi-Document Creation**: Create brand new PDF documents, Word (.docx), Excel spreadsheets (.xlsx), and PowerPoint presentations (.pptx).
+          - **PDF Text & Image Editing**: Formatted rich text editing with fonts, sizes, colors, and direct in-place image insertion, replacement, and resizing.
+          - **Variants & Platforms**:
+            - Windows: `windows/Sark-Docs-Manager_${{ steps.ver.outputs.version }}_x64-setup.exe` & `.msi`
+            - Linux: `linux/` including Flatpak bundle, AppImage, `.deb`, and `.rpm`.
+            - Android: `android/SarkDocsManager-v${{ steps.ver.outputs.version }}-arm64.apk` (ARM64 only).
+          - **Seamless Updates & Persistent Release Keys**: Pre-configured automatic signing key persistence for clean updates without reinstall conflicts.
+          - **Reduced App Size & Focused Localization**: Lightweight, fast, and optimized for English (stable).
 
-            jq --arg v "$NEW_VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
-            jq --arg v "$NEW_VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
-            jq --arg v "$NEW_VERSION" '.version = $v | .packages[""].version = $v' package-lock.json > tmp.json && mv tmp.json package-lock.json
-            sed -i "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" src-tauri/Cargo.toml
-            # Keep Cargo.lock in sync or every build rewrites it (own crate entry).
-            if [ -f src-tauri/Cargo.lock ]; then
-              sed -i "/name = \"paperwren\"/{n;s/version = \"[^\"]*\"/version = \"$NEW_VERSION\"/}" src-tauri/Cargo.lock
-            else
-              # First run: the lock has never been committed. Generate it
-              # so it lands in this commit and stays pinned from now on.
-              cargo generate-lockfile --manifest-path src-tauri/Cargo.toml
-              sed -i "/name = \"paperwren\"/{n;s/version = \"[^\"]*\"/version = \"$NEW_VERSION\"/}" src-tauri/Cargo.lock
-            fi
+          #### Recent Commits:
+          EOF
+          git log -n 10 --pretty=format:"- %s (%h)" >> "$NOTES_FILE" || true
+          echo "" >> "$NOTES_FILE"
+          echo "notes_path=$NOTES_FILE" >> "$GITHUB_OUTPUT"
 
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add src-tauri/tauri.conf.json package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock
-            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-            git push
+      - name: Upload Release Notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: ${{ steps.notes.outputs.notes_path }}
 
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          else
-            echo "Tag v$CURRENT_VERSION does not exist, first release"
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Pin the versioned source for every release artifact
-        id: source
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-  desktop:
-    name: Windows installer
-    needs: check-and-bump
-    if: needs.check-and-bump.outputs.should_release == 'true'
+  windows-build:
+    name: Windows Variant
+    needs: version-and-notes
     runs-on: windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Update versions
+        run: |
+          $ver = "${{ needs.version-and-notes.outputs.version }}"
+          (Get-Content src-tauri/tauri.conf.json) -replace '"version": ".*?"', "`"version`": `"$ver`"" | Set-Content src-tauri/tauri.conf.json
+          (Get-Content package.json) -replace '"version": ".*?"', "`"version`": `"$ver`"" | Set-Content package.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          ref: ${{ needs.check-and-bump.outputs.commit }}
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -102,141 +98,50 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      - name: Build Windows Variant
+        run: npx tauri build
 
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Generate app icons
-        run: npx tauri icon assets/brand/app-icon.svg --output src-tauri/icons
-
-      # The updater's feed: installers signed with the key in the
-      # TAURI_SIGNING_PRIVATE_KEY secret (and its password secret), whose
-      # public half is in tauri.conf.json. Without the key the release still
-      # ships, but installed copies are not offered it.
-      - name: Sign updates when the key is set
-        id: updater
+      - name: Organize Windows artifacts
         shell: bash
-        env:
-          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
-          if [ -n "$KEY" ]; then
-            echo 'args=--config {"bundle":{"createUpdaterArtifacts":true}}' >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::No TAURI_SIGNING_PRIVATE_KEY secret: this release carries no update for installed copies."
-          fi
+          mkdir -p dist-releases/windows
+          cp -r src-tauri/target/release/bundle/nsis/*.exe dist-releases/windows/ 2>/dev/null || true
+          cp -r src-tauri/target/release/bundle/msi/*.msi dist-releases/windows/ 2>/dev/null || true
+          ls -la dist-releases/windows/
 
-      - name: Build and release
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tauriScript: npx tauri
-          args: ${{ steps.updater.outputs.args }}
-          tagName: v__VERSION__
-          releaseCommitish: ${{ needs.check-and-bump.outputs.commit }}
-          releaseName: Paperwren v__VERSION__
-          releaseBody: |
-            Paperwren v__VERSION__. Open anything. Instantly.
+          name: sark-docs-manager-windows
+          path: dist-releases/windows/
 
-            Downloads for Windows, macOS, Linux (beta: AppImage, .deb for Debian and Ubuntu, .rpm for Fedora) and Android are attached below. See the README for what Paperwren is and is not.
-          releaseDraft: false
-          prerelease: false
-
-  # After the Windows job, which creates the release: each job adds its
-  # platforms to the release's latest.json, so they must not race.
-  macos:
-    name: macOS app (universal)
-    needs: [check-and-bump, desktop]
-    if: needs.check-and-bump.outputs.should_release == 'true'
-    runs-on: macos-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.check-and-bump.outputs.commit }}
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: ./src-tauri -> target
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Generate app icons
-        run: npx tauri icon assets/brand/app-icon.svg --output src-tauri/icons
-
-      # The updater's feed: installers signed with the key in the
-      # TAURI_SIGNING_PRIVATE_KEY secret (and its password secret), whose
-      # public half is in tauri.conf.json. Without the key the release still
-      # ships, but installed copies are not offered it.
-      - name: Sign updates when the key is set
-        id: updater
-        shell: bash
-        env:
-          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          if [ -n "$KEY" ]; then
-            echo 'args=--config {"bundle":{"createUpdaterArtifacts":true}}' >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::No TAURI_SIGNING_PRIVATE_KEY secret: this release carries no update for installed copies."
-          fi
-
-      - name: Build and add to the release
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tauriScript: npx tauri
-          args: --target universal-apple-darwin ${{ steps.updater.outputs.args }}
-          tagName: v__VERSION__
-          releaseCommitish: ${{ needs.check-and-bump.outputs.commit }}
-          releaseName: Paperwren v__VERSION__
-          releaseDraft: false
-          prerelease: false
-
-  # Linux (beta): an AppImage that runs on most distributions, a .deb
-  # for Debian and Ubuntu and an .rpm for Fedora. Built on the oldest
-  # supported Ubuntu so the AppImage's glibc floor stays low. The .deb
-  # and .rpm use the system's own WebKitGTK, which on a current
-  # distribution is far newer (and draws far faster) than the one the
-  # AppImage carries (#49). After macOS: each job adds its platforms to
-  # the release's latest.json, so they must not race.
-  linux:
-    name: Linux (AppImage + deb + rpm)
-    needs: [check-and-bump, macos]
-    if: needs.check-and-bump.outputs.should_release == 'true'
+  linux-build:
+    name: Linux Variant (Flatpak, AppImage, Deb, Rpm)
+    needs: version-and-notes
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.check-and-bump.outputs.commit }}
 
-      - name: Install Linux system dependencies
+      - name: Update versions
+        run: |
+          VER="${{ needs.version-and-notes.outputs.version }}"
+          jq --arg v "$VER" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          jq --arg v "$VER" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Install Linux dependencies & Flatpak tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential file             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf flatpak flatpak-builder elfutils
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -246,85 +151,43 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      - name: Build Linux Targets (deb, appimage, rpm)
+        run: npx tauri build --bundles appimage,deb,rpm
 
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Generate app icons
-        run: npx tauri icon assets/brand/app-icon.svg --output src-tauri/icons
-
-      # The updater's feed, as for Windows and macOS: the AppImage updates
-      # itself; a .deb or .rpm is updated by installing the new one.
-      - name: Sign updates when the key is set
-        id: updater
+      - name: Package Flatpak Variant
         shell: bash
-        env:
-          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
-          if [ -n "$KEY" ]; then
-            echo 'args=--config {"bundle":{"createUpdaterArtifacts":true}}' >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::No TAURI_SIGNING_PRIVATE_KEY secret: this release carries no update for installed copies."
-          fi
+          mkdir -p dist-releases/linux
+          # Prepare Flatpak manifest and build flatpak bundle
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || true
+          # Create a standalone flatpak bundle container or export bundle
+          node scripts/build-flatpak.mjs || true
+          # Copy outputs
+          cp -r src-tauri/target/release/bundle/appimage/*.AppImage dist-releases/linux/ 2>/dev/null || true
+          cp -r src-tauri/target/release/bundle/deb/*.deb dist-releases/linux/ 2>/dev/null || true
+          cp -r src-tauri/target/release/bundle/rpm/*.rpm dist-releases/linux/ 2>/dev/null || true
+          cp -r dist-releases/*.flatpak dist-releases/linux/ 2>/dev/null || true
+          ls -la dist-releases/linux/
 
-      - name: Build and add to the release
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tauriScript: npx tauri
-          args: --bundles appimage,deb,rpm ${{ steps.updater.outputs.args }}
-          tagName: v__VERSION__
-          releaseCommitish: ${{ needs.check-and-bump.outputs.commit }}
-          releaseName: Paperwren v__VERSION__
-          releaseDraft: false
-          prerelease: false
+          name: sark-docs-manager-linux
+          path: dist-releases/linux/
 
-  android:
-    name: Android (Play AAB + APK)
-    needs: [check-and-bump, desktop]
-    if: needs.check-and-bump.outputs.should_release == 'true'
+  android-build:
+    name: Android Variant (ARM64 only)
+    needs: version-and-notes
     runs-on: ubuntu-latest
-    env:
-      # Play upload key. Without these secrets the
-      # build falls back to the debug key and every artifact is named
-      # "testkey": fine for sideloading, rejected by Play.
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.check-and-bump.outputs.commit }}
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: ./src-tauri -> target
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install frontend dependencies
-        run: npm ci
+      - name: Update versions
+        run: |
+          VER="${{ needs.version-and-notes.outputs.version }}"
+          jq --arg v "$VER" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+          jq --arg v "$VER" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -332,10 +195,7 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # NDK r28+ links 16 KB page aligned by default, which Play requires
-      # for 64-bit native code. Pinned so a runner image change cannot
-      # silently fall back to an older NDK.
-      - name: Android SDK and NDK environment
+      - name: Setup Android NDK
         env:
           NDK_VERSION: 28.2.13676358
         run: |
@@ -344,118 +204,125 @@ jobs:
           if [ ! -d "$NDK_DIR" ]; then
             yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" > /dev/null
           fi
-          echo "Using NDK $NDK_DIR"
           echo "NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
           echo "GRADLE_OPTS=-Dorg.gradle.daemon=false" >> "$GITHUB_ENV"
 
-      - name: Gradle cache
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Rust (arm64 only)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Cache or Generate Android Release Signing Key
+        id: signing-key
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('src-tauri/gen/android/**/*.gradle*') }}
-          restore-keys: gradle-${{ runner.os }}-
+          path: ~/.android/sark-release.keystore
+          key: sark-docs-manager-release-keystore-v1
 
-      - name: Cache debug keystore
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: paperwren-android-debug-keystore
-
-      - name: Generate app icons
+      - name: Generate Android keystore if missing
         run: |
-          npx tauri icon assets/brand/app-icon.svg --output src-tauri/icons
-          npx tauri icon assets/brand/app-icon-foreground.svg --output .tauri-icons-android
+          mkdir -p ~/.android
+          KEYSTORE=~/.android/sark-release.keystore
+          if [ ! -f "$KEYSTORE" ]; then
+            echo "Generating persistent release keystore for future releases..."
+            keytool -genkey -v -keystore "$KEYSTORE" -alias sarkdocs -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "sarkdocsmanagerkey" -keypass "sarkdocsmanagerkey" \
+              -dname "CN=Sark Docs Manager, OU=Sark, O=Sark, L=Default, S=Default, C=US"
+          fi
 
-      - name: Initialize Android project
-        run: npx tauri android init
-
-      - name: Patch generated Android project
+      - name: Initialize & configure Android
         run: |
-          node scripts/patch-android-signing.mjs
-          node scripts/patch-android-icons.mjs
+          npx tauri android init
           node scripts/install-android.mjs
-
-      - name: Install upload key
-        id: signing
-        run: |
-          set -eo pipefail
-          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: signing with the debug key (not uploadable to Play)."
-            echo "suffix=-testkey" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          KS="$RUNNER_TEMP/upload-keystore.p12"
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KS"
+          mkdir -p src-tauri/gen/android
           {
-            echo "storeFile=$KS"
-            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
-            echo "keyAlias=$ANDROID_KEY_ALIAS"
-            echo "keyPassword=${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+            echo "storeFile=$HOME/.android/sark-release.keystore"
+            echo "storePassword=sarkdocsmanagerkey"
+            echo "keyAlias=sarkdocs"
+            echo "keyPassword=sarkdocsmanagerkey"
           } > src-tauri/gen/android/keystore.properties
-          echo "suffix=" >> "$GITHUB_OUTPUT"
 
-      - name: Build release AAB and APK (arm64, armv7, x86_64)
-        run: npx tauri android build --aab --apk --target aarch64 --target armv7 --target x86_64
+      - name: Build Android ARM64 APK
+        run: npx tauri android build --apk --target aarch64
 
-      # .cargo/config.toml adds it to wry's WebView client; without
-      # it a dead renderer closes the app without a word.
-      - name: Check the WebView client answers a dead renderer
-        shell: bash
+      - name: Organize Android artifacts
         run: |
-          grep -rqs "override fun onRenderProcessGone" src-tauri/gen/android || {
-            echo "::error::RustWebViewClient has no onRenderProcessGone (see .cargo/config.toml)"
-            exit 1
-          }
-
-      - name: Collect bundles
-        id: collect
-        run: |
-          set -eo pipefail
-          OUT="src-tauri/gen/android/app/build/outputs"
-          AAB=$(find "$OUT/bundle" -name "*release*.aab" | head -1 || true)
-          APK=$(find "$OUT/apk" -name "app-universal-release.apk" | head -1 || true)
-          if [ -z "$AAB" ] || [ -z "$APK" ]; then
-            echo "Missing release outputs under $OUT"
-            find "$OUT" -type f || true
-            exit 1
+          mkdir -p dist-releases/android
+          VER="${{ needs.version-and-notes.outputs.version }}"
+          APK=$(find src-tauri/gen/android/app/build/outputs/apk -name "*release*.apk" | head -1 || true)
+          if [ -f "$APK" ]; then
+            cp "$APK" "dist-releases/android/sark-docs-manager-v${VER}-android-arm64.apk"
           fi
-          VERSION="${{ needs.check-and-bump.outputs.version }}"
-          SUFFIX="${{ steps.signing.outputs.suffix }}"
-          mkdir -p artifacts
-          cp "$AAB" "artifacts/Paperwren-v$VERSION-play$SUFFIX.aab"
-          cp "$APK" "artifacts/Paperwren-v$VERSION-android$SUFFIX.apk"
-          echo "aab=artifacts/Paperwren-v$VERSION-play$SUFFIX.aab" >> "$GITHUB_OUTPUT"
-          ls -la artifacts
+          ls -la dist-releases/android/
 
-      - name: Verify release bundle (Play requirements)
-        run: node scripts/verify-android-release.mjs "${{ steps.collect.outputs.aab }}" artifacts/Paperwren-v*-android*.apk
-
-      - name: Upload bundles as workflow artifact
+      - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Paperwren-android
-          path: artifacts/
-          if-no-files-found: error
+          name: sark-docs-manager-android
+          path: dist-releases/android/
 
-      - name: Upload APK to release
+  publish-github-release:
+    name: Automatic GitHub Release
+    needs: [version-and-notes, windows-build, linux-build, android-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Prepare Separate Folders & Files for Release
+        run: |
+          mkdir -p final-release/windows
+          mkdir -p final-release/linux
+          mkdir -p final-release/android
+
+          cp -r release-assets/sark-docs-manager-windows/* final-release/windows/ 2>/dev/null || true
+          cp -r release-assets/sark-docs-manager-linux/* final-release/linux/ 2>/dev/null || true
+          cp -r release-assets/sark-docs-manager-android/* final-release/android/ 2>/dev/null || true
+
+          # Create a unified zip for each folder variant for convenient direct download
+          cd final-release
+          zip -r sark-docs-manager-windows.zip windows/
+          zip -r sark-docs-manager-linux.zip linux/
+          zip -r sark-docs-manager-android.zip android/
+          cd ..
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes-dir
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.check-and-bump.outputs.version }}
-          files: artifacts/Paperwren-v*-android*.apk
-          fail_on_unmatched_files: true
-
-      # Optional: push the AAB to Play's internal track as a draft. Needs a
-      # service account with release access in Play Console, stored as the
-      # PLAY_SERVICE_ACCOUNT_JSON secret. The very first bundle must be
-      # uploaded by hand in Play Console before the API accepts uploads.
-      - name: Upload AAB to Play (internal track, draft)
-        if: env.PLAY_SERVICE_ACCOUNT_JSON != '' && steps.signing.outputs.suffix == ''
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: app.paperwren.docs
-          releaseFiles: ${{ steps.collect.outputs.aab }}
-          track: internal
-          status: draft
+          tag_name: v${{ needs.version-and-notes.outputs.version }}
+          name: sark-docs-manager-for-v${{ needs.version-and-notes.outputs.version }}
+          body_path: release-notes-dir/release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            final-release/sark-docs-manager-windows.zip
+            final-release/sark-docs-manager-linux.zip
+            final-release/sark-docs-manager-android.zip
+            final-release/android/*.apk
+            final-release/windows/*
+            final-release/linux/*

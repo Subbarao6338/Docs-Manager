@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Paperwren",
+  "productName": "Sark Docs Manager",
   "version": "1.6.2",
-  "identifier": "app.paperwren.docs",
+  "identifier": "sark.docs",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Paperwren",
+        "title": "Sark Docs Manager",
         "width": 1080,
         "height": 780,
         "minWidth": 320,

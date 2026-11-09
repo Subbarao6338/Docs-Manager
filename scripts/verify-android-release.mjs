@@ -31,7 +31,7 @@ const PAGE = 16384;
 // The only uses-permission entry allowed: AndroidX defines and uses
 // it to protect its own receivers; it grants nothing.
 const ALLOWED_PERMISSIONS = [
-	"app.paperwren.docs.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+	"sark.docs.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
 ];
 
 const problems = [];

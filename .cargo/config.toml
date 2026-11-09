@@ -9,7 +9,7 @@
 [env]
 WRY_RUSTWEBVIEWCLIENT_CLASS_EXTENSION = '''
     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
-        val activity = view.context as? app.paperwren.docs.MainActivity
+        val activity = view.context as? sark.docs.MainActivity
             ?: return super.onRenderProcessGone(view, detail)
         return activity.onRendererGone(view, detail.didCrash())
     }
