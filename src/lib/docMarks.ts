@@ -170,6 +170,26 @@ export function validMark(raw: unknown): DocMark | null {
 				size: m.size as number,
 				text: m.text,
 				color,
+				...(typeof m.bold === "boolean" ? { bold: m.bold } : {}),
+				...(typeof m.italic === "boolean" ? { italic: m.italic } : {}),
+				...(m.align === "left" || m.align === "center" || m.align === "right"
+					? { align: m.align }
+					: {}),
+				...(typeof m.fontFamily === "string" ? { fontFamily: m.fontFamily } : {}),
+			};
+		case "image":
+			if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return null;
+			if (!Number.isFinite(m.w) || !Number.isFinite(m.h)) return null;
+			if (typeof m.dataUrl !== "string") return null;
+			return {
+				...base,
+				kind: "image",
+				x: m.x as number,
+				y: m.y as number,
+				w: m.w as number,
+				h: m.h as number,
+				dataUrl: m.dataUrl,
+				...(Number.isFinite(m.opacity) ? { opacity: m.opacity as number } : {}),
 			};
 		case "measure":
 			if (!Array.isArray(m.points) || !m.points.every(isPoint)) return null;
@@ -333,9 +353,10 @@ function topOf(mark: DocMark): number {
 			return Math.min(...mark.points.map((p) => p[1]));
 		case "note":
 		case "text":
+		case "image":
 			return mark.y;
 		default:
-			return mark.boxes[0]?.y ?? 0;
+			return "boxes" in mark && mark.boxes[0] ? mark.boxes[0].y : 0;
 	}
 }
 
@@ -349,11 +370,11 @@ export function sortMarks(marks: DocMark[]): DocMark[] {
 
 /** Marks that hold words: the rest are only drawn. */
 export const hasWords = (mark: DocMark) =>
-	mark.kind !== "ink" && mark.kind !== "measure";
+	mark.kind !== "ink" && mark.kind !== "measure" && mark.kind !== "image";
 
 /** The words a mark holds, or the words of the note on it. */
 export function markText(mark: DocMark): string {
-	if (mark.kind === "ink" || mark.kind === "measure") return "";
+	if (mark.kind === "ink" || mark.kind === "measure" || mark.kind === "image") return "";
 	return mark.text;
 }
 
@@ -371,7 +392,7 @@ export function marksToMarkdown(
 		const page = label(mark.page);
 		if (mark.kind === "note" || mark.kind === "text") {
 			lines.push(`- ${mark.text.replace(/\n+/g, " ")} (${page})`, "");
-		} else if (mark.kind !== "ink" && mark.kind !== "measure") {
+		} else if (mark.kind !== "ink" && mark.kind !== "measure" && mark.kind !== "image") {
 			lines.push(`> ${mark.text.replace(/\n+/g, " ")} (${page})`, "");
 			if (mark.note) lines.push(mark.note, "");
 		}

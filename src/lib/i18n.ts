@@ -1,134 +1,54 @@
 /**
- * The interface's languages.
- *
- * English is the source: `t("Open file")` is looked up by its English
- * text, and a language that has no entry for it shows the English. So
- * the code reads as it did before, a missing translation is never a
- * blank, and locales.test.ts fails when a string in the code is
- * missing from a table.
- *
- * Only Paperwren's own buttons and messages change. Documents are
- * shown as they are, in their own direction.
+ * The interface language: locked to stable English.
+ * Unnecessary localization overhead has been removed to reduce app sizes.
  */
 
-export type Language =
-	| "en"
-	| "zh"
-	| "hi"
-	| "es"
-	| "fr"
-	| "pt"
-	| "ru"
-	| "ar"
-	| "ur";
+export type Language = "en";
 export type LanguageSetting = "system" | Language;
 
 type Category = "zero" | "one" | "two" | "few" | "many" | "other";
-/** A translation, or one per plural category of the language. */
 export type Entry =
 	| string
 	| (Partial<Record<Category, string>> & { other: string });
 export type Table = Record<string, Entry>;
 
-/** Each language under its own name. */
+/** Stable English only. */
 export const LANGUAGES: Array<[Language, string]> = [
 	["en", "English"],
-	["zh", "中文"],
-	["hi", "हिन्दी"],
-	["es", "Español"],
-	["fr", "Français"],
-	["pt", "Português"],
-	["ru", "Русский"],
-	["ar", "العربية"],
-	["ur", "اردو"],
 ];
 
-/** Each language's table is its own chunk: a start in English (or in
- * any one language) never pays for the others. */
-const LOADERS: Record<Exclude<Language, "en">, () => Promise<Table>> = {
-	zh: () => import("./locales/zh").then((m) => m.zh),
-	hi: () => import("./locales/hi").then((m) => m.hi),
-	es: () => import("./locales/es").then((m) => m.es),
-	fr: () => import("./locales/fr").then((m) => m.fr),
-	pt: () => import("./locales/pt").then((m) => m.pt),
-	ru: () => import("./locales/ru").then((m) => m.ru),
-	ar: () => import("./locales/ar").then((m) => m.ar),
-	ur: () => import("./locales/ur").then((m) => m.ur),
-};
-const TABLES: Partial<Record<Language, Table>> = {};
-
-/** Fetch a language's table, once. Until it is in, that language's
- * strings read in English. */
-export async function loadLanguage(lang: Language): Promise<void> {
-	if (lang === "en" || TABLES[lang]) return;
-	TABLES[lang] = await LOADERS[lang]();
+export async function loadLanguage(_lang: Language): Promise<void> {
+	// English is built-in
 }
-const RTL: Language[] = ["ur", "ar"];
-const HINT_KEY = "paperwren.lang";
 
-const supported = (code: string | null | undefined): Language | null =>
-	LANGUAGES.find(([lang]) => code?.toLowerCase().startsWith(lang))?.[0] ?? null;
-
-/** The language to use for a setting: the chosen one, or the first of
- * the phone's languages that Paperwren speaks. */
 export function resolveLanguage(
-	setting: LanguageSetting,
-	preferred: readonly string[] = typeof navigator === "undefined"
-		? []
-		: (navigator.languages ?? [navigator.language]),
+	_setting: LanguageSetting,
+	_preferred?: readonly string[],
 ): Language {
-	if (setting !== "system") return setting;
-	for (const code of preferred) {
-		const lang = supported(code);
-		if (lang) return lang;
-	}
 	return "en";
 }
 
-// Settings load a moment after the first paint; the last language used
-// is kept where it can be read at once, so the app does not open in
-// English and then switch.
-function hinted(): Language {
-	try {
-		return supported(localStorage.getItem(HINT_KEY)) ?? "en";
-	} catch {
-		return "en";
-	}
-}
-
-let current: Language = hinted();
+let current: Language = "en";
 const listeners = new Set<() => void>();
 
 function apply() {
 	if (typeof document === "undefined") return;
-	document.documentElement.lang = current;
-	document.documentElement.dir = RTL.includes(current) ? "rtl" : "ltr";
+	document.documentElement.lang = "en";
+	document.documentElement.dir = "ltr";
 }
 apply();
 
-export const language = (): Language => current;
-export const isRtl = (lang: Language = current): boolean => RTL.includes(lang);
-/** "rtl" or "ltr", for interface text that sits inside a document's
- * (always left-to-right) frame. */
-export const uiDir = () => (isRtl() ? "rtl" : "ltr");
-/** For dates and times: the interface language, or the system's own
- * conventions when that is English. */
-export const locale = (): string | undefined =>
-	current === "en" ? undefined : current;
+export const language = (): Language => "en";
+export const isRtl = (_lang: Language = current): boolean => false;
+export const uiDir = () => "ltr";
+export const locale = (): string | undefined => undefined;
 
-export function setLanguage(lang: Language) {
-	if (lang === current) return;
-	current = lang;
-	try {
-		localStorage.setItem(HINT_KEY, lang);
-	} catch {
-		// No storage: the next start begins in English, then switches.
-	}
+export function setLanguage(_lang: Language) {
+	current = "en";
 	apply();
 	for (const listener of listeners) listener();
 }
 
-/** For React: re-render when the language changes. */
 export function subscribe(listener: () => void): () => void {
 	listeners.add(listener);
 	return () => listeners.delete(listener);
@@ -136,49 +56,31 @@ export function subscribe(listener: () => void): () => void {
 
 type Vars = Record<string, string | number>;
 
-/**
- * In a right-to-left sentence a file name, a size or a count is a
- * left-to-right island: wrapped in Unicode isolates so "9 KB" or
- * "report (2).pdf" keeps its own order and does not drag the
- * punctuation around it.
- */
-export const isolate = (text: string | number): string =>
-	RTL.includes(current) ? `\u2068${text}\u2069` : String(text);
+export const isolate = (text: string | number): string => String(text);
 
 const formats = new Map<string, Intl.NumberFormat>();
 
-/** A number the way the reader writes it ("1 234,5" in Russian, "1,234.5"
- * in English), in the Latin digits the rest of the app uses. */
 export function formatNumber(
 	value: number,
 	options: Intl.NumberFormatOptions = {},
 ): string {
-	const id = `${current}|${JSON.stringify(options)}`;
+	const id = `en|${JSON.stringify(options)}`;
 	let format = formats.get(id);
 	if (!format) {
-		format = new Intl.NumberFormat(`${current}-u-nu-latn`, options);
+		format = new Intl.NumberFormat("en-US", options);
 		formats.set(id, format);
 	}
 	return format.format(value);
 }
 
-/*
- * Dates, plurals and the order of names, each from one formatter kept per
- * language. WebKit's engine (Linux, macOS) builds a new one for every
- * toLocaleDateString, PluralRules or localeCompare with options: over a
- * folder of hundreds of files that is seconds of work, a sort alone
- * thousands of them.
- */
 const dates = new Map<string, Intl.DateTimeFormat>();
-const plurals = new Map<string, Intl.PluralRules>();
 const collators = new Map<string, Intl.Collator>();
 
-/** A date or a time the way the reader writes it. */
 export function formatDate(
 	date: Date | number,
 	options: Intl.DateTimeFormatOptions,
 ): string {
-	const id = `${current}|${JSON.stringify(options)}`;
+	const id = `en|${JSON.stringify(options)}`;
 	let format = dates.get(id);
 	if (!format) {
 		format = new Intl.DateTimeFormat(locale(), options);
@@ -187,16 +89,14 @@ export function formatDate(
 	return format.format(date);
 }
 
-/** Two names in the order a person counts them ("2" before "10"),
- * whatever their case or accents. */
 export function compareNames(a: string, b: string): number {
-	let collator = collators.get(current);
+	let collator = collators.get("en");
 	if (!collator) {
-		collator = new Intl.Collator(locale(), {
+		collator = new Intl.Collator("en", {
 			numeric: true,
 			sensitivity: "base",
 		});
-		collators.set(current, collator);
+		collators.set("en", collator);
 	}
 	return collator.compare(a, b);
 }
@@ -210,31 +110,13 @@ const fill = (text: string, vars?: Vars) =>
 			})
 		: text;
 
-/** `text` in the interface language; `{name}` takes `vars.name`. */
 export function t(text: string, vars?: Vars): string {
-	const entry = TABLES[current]?.[text];
-	return fill(typeof entry === "string" ? entry : (entry?.other ?? text), vars);
+	return fill(text, vars);
 }
 
-/**
- * A phrase that depends on a count: "1 page", "3 pages". The plural
- * English form is the key; languages with more forms (Arabic has six)
- * give one per category. `{n}` is the count.
- */
 export function tn(count: number, one: string, other: string, vars?: Vars) {
 	const all = { n: count, ...vars };
-	const entry = TABLES[current]?.[other];
-	if (entry === undefined) return fill(count === 1 ? one : other, all);
-	if (typeof entry === "string") return fill(entry, all);
-	let rules = plurals.get(current);
-	if (!rules) {
-		rules = new Intl.PluralRules(current);
-		plurals.set(current, rules);
-	}
-	const category = rules.select(count) as Category;
-	return fill(entry[category] ?? entry.other, all);
+	return fill(count === 1 ? one : other, all);
 }
 
-/** Marks a string as interface text where it is defined (a constant, a
- * parser's label); it is translated with `t` where it is shown. */
 export const msg = (text: string) => text;

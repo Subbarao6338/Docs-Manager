@@ -1,4 +1,4 @@
-package app.paperwren.docs
+package sark.docs
 
 import android.content.ClipData
 import android.content.ComponentName

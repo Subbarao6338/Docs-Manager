@@ -60,15 +60,33 @@ export function paintText(
 	size: number,
 	width: number,
 	color: string,
+	options: {
+		bold?: boolean;
+		italic?: boolean;
+		align?: "left" | "center" | "right";
+		fontFamily?: string;
+	} = {},
 ) {
-	ctx.font = textFont(size);
+	const weight = options.bold ? "bold " : "";
+	const style = options.italic ? "italic " : "";
+	const family = options.fontFamily || "Manrope Variable, sans-serif";
+	ctx.font = `${style}${weight}${size}px ${family}`;
 	ctx.fillStyle = color;
 	ctx.textBaseline = "top";
+
 	lines.forEach((line, i) => {
 		const rtl = startsRtl(line);
 		ctx.direction = rtl ? "rtl" : "ltr";
-		ctx.textAlign = rtl ? "right" : "left";
-		ctx.fillText(line, rtl ? width : 0, i * size * LINE_HEIGHT);
+		if (options.align === "center") {
+			ctx.textAlign = "center";
+			ctx.fillText(line, width / 2, i * size * LINE_HEIGHT);
+		} else if (options.align === "right" || (rtl && !options.align)) {
+			ctx.textAlign = "right";
+			ctx.fillText(line, width, i * size * LINE_HEIGHT);
+		} else {
+			ctx.textAlign = "left";
+			ctx.fillText(line, 0, i * size * LINE_HEIGHT);
+		}
 	});
 }
 
@@ -93,6 +111,12 @@ export async function textPicture(
 		mark.size,
 		width,
 		mark.color,
+		{
+			bold: mark.bold,
+			italic: mark.italic,
+			align: mark.align,
+			fontFamily: mark.fontFamily,
+		},
 	);
 	const blob = await new Promise<Blob | null>((done) =>
 		canvas.toBlob(done, "image/png"),

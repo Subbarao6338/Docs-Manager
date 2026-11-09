@@ -188,7 +188,7 @@ function balanced(src) {
 
 function validateActivity(src) {
 	const required = [
-		"package app.paperwren.docs",
+		"package sark.docs",
 		"class MainActivity : TauriActivity()",
 		"override fun onCreate(savedInstanceState: Bundle?)",
 		"super.onCreate(savedInstanceState)",

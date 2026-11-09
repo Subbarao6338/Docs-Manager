@@ -34,6 +34,7 @@ import {
 	Eraser,
 	Hand,
 	Highlighter,
+	Image as ImageIcon,
 	Minus,
 	PenLine,
 	Plus,
@@ -72,6 +73,7 @@ export type MarkTool =
 	| "strike"
 	| "note"
 	| "text"
+	| "image"
 	| "measure"
 	| "erase";
 type Item = DocMark;
@@ -579,6 +581,7 @@ export function MarkUp({
 		["strike", t("Strike out"), <Strikethrough key="s" size={20} />],
 		["note", t("Note"), <StickyNote key="n" size={20} />],
 		["text", t("Text"), <Type key="t" size={20} />],
+		["image", t("Image"), <ImageIcon key="img" size={20} />],
 		["measure", t("Measure"), <Ruler key="r" size={20} />],
 		["erase", t("Eraser"), <Eraser key="e" size={20} />],
 	];
@@ -613,6 +616,7 @@ export function MarkUp({
 		strike: t("Drag across the words to strike them out."),
 		note: t("Tap the page where the note belongs."),
 		text: t("Tap the page where the text goes."),
+		image: t("Tap the page to place or insert an image."),
 		measure: settingScale
 			? t("Drag along something whose real length you know.")
 			: measuring === "area"
@@ -1249,6 +1253,18 @@ function MarkShape({
 					</text>
 				)}
 			</>
+		);
+	}
+	if (item.kind === "image") {
+		return (
+			<image
+				x={item.x * pw}
+				y={item.y * ph}
+				width={item.w * pw}
+				height={item.h * ph}
+				href={item.dataUrl}
+				opacity={item.opacity ?? 1}
+			/>
 		);
 	}
 	return (

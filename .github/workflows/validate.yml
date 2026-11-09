@@ -141,7 +141,7 @@ jobs:
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
-          name: Paperwren-windows-test
+          name: Sark-Docs-Manager-windows-test
           path: |
             src-tauri/target/release/bundle/nsis/*-setup.exe
             src-tauri/target/release/bundle/msi/*.msi
@@ -191,7 +191,7 @@ jobs:
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
-          name: Paperwren-linux-test
+          name: Sark-Docs-Manager-linux-test
           path: |
             src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
@@ -199,43 +199,6 @@ jobs:
           if-no-files-found: error
 
   # A disk image to try on a Mac before anything is published.
-  macos:
-    name: macOS disk image (universal)
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: ./src-tauri -> target
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Generate app icons
-        run: npx tauri icon assets/brand/app-icon.svg --output src-tauri/icons
-
-      - name: Build universal app and disk image
-        run: npx tauri build --target universal-apple-darwin --bundles app,dmg
-
-      - name: Verify bundle (both architectures, ad hoc signature)
-        run: node scripts/verify-macos-bundle.mjs src-tauri/target/universal-apple-darwin/release/bundle
-
-      - name: Upload disk image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Paperwren-macos-universal
-          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/Paperwren_*_universal.dmg
-          if-no-files-found: error
 
   android:
     name: Android APK (optimized test build, arm64)
@@ -329,19 +292,19 @@ jobs:
             exit 1
           fi
           mkdir -p artifacts
-          cp "$APK" artifacts/Paperwren-test-android-arm64.apk
+          cp "$APK" artifacts/Sark-Docs-Manager-test-android-arm64.apk
 
       - name: Verify APK signature, architecture and size
         run: |
           set -eo pipefail
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify --verbose artifacts/Paperwren-test-android-arm64.apk
+          "$APKSIGNER" verify --verbose artifacts/Sark-Docs-Manager-test-android-arm64.apk
           python3 - <<'PY'
           import os
           import zipfile
           from pathlib import Path
 
-          apk = Path("artifacts/Paperwren-test-android-arm64.apk")
+          apk = Path("artifacts/Sark-Docs-Manager-test-android-arm64.apk")
           size = apk.stat().st_size / 1024 / 1024
           with zipfile.ZipFile(apk) as archive:
               libraries = [entry for entry in archive.infolist()
@@ -361,6 +324,6 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Paperwren-test-android-arm64
-          path: artifacts/Paperwren-test-android-arm64.apk
+          name: Sark-Docs-Manager-test-android-arm64
+          path: artifacts/Sark-Docs-Manager-test-android-arm64.apk
           if-no-files-found: error

@@ -14,6 +14,12 @@ import type { OpenRequest, RecentEntry } from "@/lib/types";
 import type { ToolId } from "@/screens/tools/ToolsScreen";
 import { FileDetails, HandOffItems } from "@/screens/viewer/FileMenu";
 import { RenameDialog } from "@/screens/viewer/RenameDialog";
+import {
+	createNewPdf,
+	createNewPresentation,
+	createNewWordDoc,
+	createNewWorkbook,
+} from "@/lib/documentCreation";
 import { MAX_FOLDERS, useFolders } from "@/state/folders";
 import { useRecents } from "@/state/recents";
 import {
@@ -47,6 +53,10 @@ import {
 	SearchX,
 	Settings as SettingsIcon,
 	ShieldCheck,
+	FileText,
+	FileSpreadsheet,
+	Presentation,
+	FilePlus2,
 	Trash2,
 } from "lucide-react";
 import {
@@ -316,7 +326,7 @@ export function Home({
 				<div className={s.brandCol}>
 					<span className={s.greeting}>{greeting()}</span>
 					<h1 className={s.brand}>
-						Paper<span className="brand-accent">wren</span>
+						Sark<span className="brand-accent"> Docs</span>
 					</h1>
 				</div>
 				{isDesktop && (
@@ -355,6 +365,62 @@ export function Home({
 							</button>
 						</div>
 						<div className={s.toolGrid}>
+							<button
+								type="button"
+								className={s.toolShortcut}
+								onClick={async () => {
+									const bytes = await createNewPdf("New PDF");
+									onOpenRequest(requestForBytes("Untitled.pdf", bytes));
+								}}
+								data-testid="create-pdf"
+							>
+								<span className={s.toolIcon}>
+									<FilePlus2 size={20} />
+								</span>
+								<span>{t("New PDF")}</span>
+							</button>
+							<button
+								type="button"
+								className={s.toolShortcut}
+								onClick={() => {
+									const bytes = createNewWordDoc("New Document");
+									onOpenRequest(requestForBytes("Untitled.docx", bytes));
+								}}
+								data-testid="create-docx"
+							>
+								<span className={s.toolIcon}>
+									<FileText size={20} />
+								</span>
+								<span>{t("New Word")}</span>
+							</button>
+							<button
+								type="button"
+								className={s.toolShortcut}
+								onClick={() => {
+									const bytes = createNewWorkbook("Sheet1");
+									onOpenRequest(requestForBytes("Untitled.xlsx", bytes));
+								}}
+								data-testid="create-xlsx"
+							>
+								<span className={s.toolIcon}>
+									<FileSpreadsheet size={20} />
+								</span>
+								<span>{t("New Sheet")}</span>
+							</button>
+							<button
+								type="button"
+								className={s.toolShortcut}
+								onClick={() => {
+									const bytes = createNewPresentation("New Presentation");
+									onOpenRequest(requestForBytes("Untitled.pptx", bytes));
+								}}
+								data-testid="create-pptx"
+							>
+								<span className={s.toolIcon}>
+									<Presentation size={20} />
+								</span>
+								<span>{t("New Slide")}</span>
+							</button>
 							{(
 								[
 									["scan", ScanLine, t("Scan a document")],

@@ -145,18 +145,42 @@ function shapes(
 	if (mark.kind === "text") {
 		const left = mark.x * pw;
 		const width = mark.w * pw;
+		const weight = mark.bold ? "bold " : "";
+		const italic = mark.italic ? "italic " : "";
+		const family = mark.fontFamily || "Manrope Variable, sans-serif";
 		return layoutText(mark.text, mark.size, width).map((line, i) => {
 			const rtl = startsRtl(line);
+			let posX = left;
+			let anchor = "start";
+			if (mark.align === "center") {
+				posX = left + width / 2;
+				anchor = "middle";
+			} else if (mark.align === "right" || (rtl && !mark.align)) {
+				posX = left + width;
+				anchor = "end";
+			}
 			const text = el("text", {
-				x: rtl ? left + width : left,
+				x: posX,
 				y: mark.y * ph + (i + 0.8) * mark.size * LINE_HEIGHT,
 				fill: mark.color,
 				direction: rtl ? "rtl" : "ltr",
-				style: `font:${textFont(mark.size)}`,
+				"text-anchor": anchor,
+				style: `font:${italic}${weight}${mark.size}px ${family}`,
 			});
 			text.textContent = line;
 			return text;
 		});
+	}
+	if (mark.kind === "image") {
+		const img = el("image", {
+			x: mark.x * pw,
+			y: mark.y * ph,
+			width: mark.w * pw,
+			height: mark.h * ph,
+			href: mark.dataUrl,
+			opacity: mark.opacity ?? 1,
+		});
+		return [img];
 	}
 	if (mark.kind === "measure") {
 		const points = mark.points.map(
@@ -332,8 +356,23 @@ export function drawMarks(
 				mark.size,
 				width,
 				mark.color,
+				{
+					bold: mark.bold,
+					italic: mark.italic,
+					align: mark.align,
+					fontFamily: mark.fontFamily,
+				},
 			);
 			ctx.restore();
+		} else if (mark.kind === "image") {
+			const img = new Image();
+			img.src = mark.dataUrl;
+			if (img.complete) {
+				ctx.save();
+				if (typeof mark.opacity === "number") ctx.globalAlpha = mark.opacity;
+				ctx.drawImage(img, mark.x * pw, mark.y * ph, mark.w * pw, mark.h * ph);
+				ctx.restore();
+			}
 		} else if (mark.kind === "measure") {
 			ctx.strokeStyle = mark.color;
 			ctx.lineWidth = 1.2;
