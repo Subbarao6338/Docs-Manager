@@ -14,14 +14,23 @@ import {
 	addPageNumbers,
 	addTextLayer,
 	addWatermark,
+	blankPagePdf,
 	buildPdf,
 	compressPdf,
+	cropPdf,
+	deletePagesPdf,
 	fillAndSign,
+	flattenPdf,
 	imagesToPdf,
 	pageCount,
 	pagePoint,
 	parsePages,
+	pdfMetadata,
 	protect,
+	removeAnnotations,
+	repairPdf,
+	reversePdf,
+	rotateAllPages,
 	standardText,
 	unlock,
 } from "../pdfTools";
@@ -571,5 +580,108 @@ describe("addTextLayer", () => {
 		await expect(
 			addTextLayer(await blank(), [{ page: 0, words: [] }]),
 		).rejects.toThrow();
+	});
+});
+
+describe("new enhanced PDF tools", () => {
+	it("rotates all pages by a given angle", async () => {
+		const source = await pages(3, { 1: 90 });
+		const rotated = await rotateAllPages(source, 90);
+		const out = await read(rotated);
+		expect(out.map((p) => p.rotate)).toEqual([90, 180, 90]);
+	});
+
+	it("reverses the page order of a document", async () => {
+		const source = await pages(3);
+		const reversed = await reversePdf(source);
+		const out = await read(reversed);
+		expect(out.map((p) => p.words[0]?.text)).toEqual([
+			"Page 3",
+			"Page 2",
+			"Page 1",
+		]);
+	});
+
+	it("deletes specified pages", async () => {
+		const source = await pages(4);
+		const reduced = await deletePagesPdf(source, [0, 2]);
+		const out = await read(reduced);
+		expect(out.map((p) => p.words[0]?.text)).toEqual(["Page 2", "Page 4"]);
+	});
+
+	it("crops pages by reducing cropBox dimensions", async () => {
+		const source = await pages(2);
+		const cropped = await cropPdf(source, {
+			top: 50,
+			bottom: 50,
+			left: 40,
+			right: 40,
+		});
+		const doc = await PDFDocument.load(cropped);
+		const box = doc.getPage(0).getCropBox();
+		expect(box.width).toBe(600 - 80);
+		expect(box.height).toBe(800 - 100);
+	});
+
+	it("flattens form fields permanently", async () => {
+		const doc = await PDFDocument.create();
+		const page = doc.addPage([600, 800]);
+		const form = doc.getForm();
+		const tf = form.createTextField("testField");
+		tf.setText("Flattened Value");
+		tf.addToPage(page, { x: 50, y: 700, width: 200, height: 25 });
+		const bytes = await doc.save();
+		const flat = await flattenPdf(bytes);
+		const loaded = await PDFDocument.load(flat);
+		expect(loaded.getForm().getFields()).toHaveLength(0);
+	});
+
+	it("removes annotations from all pages", async () => {
+		const doc = await PDFDocument.create();
+		const page = doc.addPage([600, 800]);
+		const form = doc.getForm();
+		const tf = form.createTextField("sampleField");
+		tf.addToPage(page, { x: 50, y: 700, width: 200, height: 25 });
+		const bytes = await doc.save();
+		const cleaned = await removeAnnotations(bytes);
+		const loaded = await PDFDocument.load(cleaned);
+		expect(loaded.getPage(0).node.has(PDFName.of("Annots"))).toBe(false);
+	});
+
+	it("inserts blank pages at start, end, or between", async () => {
+		const source = await pages(2);
+		const withStart = await blankPagePdf(source, {
+			position: "start",
+			count: 1,
+		});
+		expect(await pageCount(withStart)).toBe(3);
+		const withEnd = await blankPagePdf(source, { position: "end", count: 2 });
+		expect(await pageCount(withEnd)).toBe(4);
+		const withBetween = await blankPagePdf(source, {
+			position: "between",
+			count: 1,
+		});
+		expect(await pageCount(withBetween)).toBe(3);
+	});
+
+	it("updates document metadata", async () => {
+		const source = await pages(1);
+		const updated = await pdfMetadata(source, {
+			title: "Sark Docs Title",
+			author: "Sark Engineer",
+			subject: "Testing Metadata",
+		});
+		const loaded = await PDFDocument.load(updated);
+		expect(loaded.getTitle()).toBe("Sark Docs Title");
+		expect(loaded.getAuthor()).toBe("Sark Engineer");
+		expect(loaded.getSubject()).toBe("Testing Metadata");
+	});
+
+	it("repairs and reconstructs a PDF", async () => {
+		const source = await pages(3);
+		const repaired = await repairPdf(source);
+		expect(await pageCount(repaired)).toBe(3);
+		const out = await read(repaired);
+		expect(out[0].words[0]?.text).toBe("Page 1");
 	});
 });

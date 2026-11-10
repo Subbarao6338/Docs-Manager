@@ -13,12 +13,21 @@ import {
 	type PaperTurn,
 	addPageNumbers,
 	addWatermark,
+	blankPagePdf,
 	buildPdf,
 	compressPdf,
+	cropPdf,
+	deletePagesPdf,
 	digitallySigned,
+	flattenPdf,
 	imagesToPdf,
 	parsePages,
+	pdfMetadata,
 	protect,
+	removeAnnotations,
+	repairPdf,
+	reversePdf,
+	rotateAllPages,
 	standardText,
 	unlock,
 } from "@/lib/pdfTools";
@@ -30,12 +39,18 @@ import { zipSync } from "fflate";
 import {
 	ArrowLeft,
 	ArrowRight,
+	ArrowUpDown,
 	Camera,
 	Check,
 	Combine,
+	Crop,
 	Droplet,
+	Eraser,
+	FileCheck,
 	FileDown,
 	FileImage,
+	FilePlus2,
+	FileText,
 	Hash,
 	Highlighter,
 	Images,
@@ -49,8 +64,10 @@ import {
 	Scissors,
 	ShieldCheck,
 	Sparkles,
+	Tag,
 	TextSearch,
 	Trash2,
+	Wrench,
 } from "lucide-react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -88,7 +105,17 @@ export type ToolId =
 	| "numbers"
 	| "watermark"
 	| "protect"
-	| "unlock";
+	| "unlock"
+	| "rotateAll"
+	| "reverse"
+	| "deletePages"
+	| "crop"
+	| "flatten"
+	| "removeAnnots"
+	| "extractText"
+	| "blankPage"
+	| "metadata"
+	| "repair";
 
 const PDF = "application/pdf";
 
@@ -183,17 +210,100 @@ const TOOLS: Array<{
 		title: msg("Remove a password"),
 		hint: msg("A copy that opens without one, if you know it"),
 	},
+	{
+		id: "rotateAll",
+		icon: <RotateCw size={22} />,
+		title: msg("Rotate all pages"),
+		hint: msg("Turn all pages clockwise or upside-down"),
+	},
+	{
+		id: "reverse",
+		icon: <ArrowUpDown size={22} />,
+		title: msg("Reverse page order"),
+		hint: msg("Flip pages backwards from end to beginning"),
+	},
+	{
+		id: "deletePages",
+		icon: <Trash2 size={22} />,
+		title: msg("Delete pages"),
+		hint: msg("Remove unwanted pages from your document"),
+	},
+	{
+		id: "crop",
+		icon: <Crop size={22} />,
+		title: msg("Crop margins"),
+		hint: msg("Trim blank margins from every page"),
+	},
+	{
+		id: "flatten",
+		icon: <FileCheck size={22} />,
+		title: msg("Flatten forms & marks"),
+		hint: msg("Make all form fields and annotations permanent"),
+	},
+	{
+		id: "removeAnnots",
+		icon: <Eraser size={22} />,
+		title: msg("Remove annotations"),
+		hint: msg("Clear all ink, notes, and highlights"),
+	},
+	{
+		id: "extractText",
+		icon: <FileText size={22} />,
+		title: msg("Extract text (.txt)"),
+		hint: msg("Save all readable text as a plain text file"),
+	},
+	{
+		id: "blankPage",
+		icon: <FilePlus2 size={22} />,
+		title: msg("Insert blank pages"),
+		hint: msg("Add blank sheets at start, end, or between pages"),
+	},
+	{
+		id: "metadata",
+		icon: <Tag size={22} />,
+		title: msg("Edit document info"),
+		hint: msg("Change title, author, and description"),
+	},
+	{
+		id: "repair",
+		icon: <Wrench size={22} />,
+		title: msg("Repair document"),
+		hint: msg("Rebuild structure to fix corrupted or damaged PDFs"),
+	},
 ];
 
 const GROUPS = [
-	{ title: msg("Arrange your pages"), ids: ["merge", "organize", "extract"] },
+	{
+		title: msg("Arrange your pages"),
+		ids: [
+			"merge",
+			"organize",
+			"extract",
+			"rotateAll",
+			"reverse",
+			"deletePages",
+			"blankPage",
+		],
+	},
 	{
 		title: msg("Convert your files"),
-		ids: ["ocr", "compress", "images", "pictures"],
+		ids: ["ocr", "compress", "images", "pictures", "extractText"],
 	},
 	{
 		title: msg("Add the finishing touches"),
-		ids: ["markup", "numbers", "watermark", "protect", "unlock"],
+		ids: [
+			"markup",
+			"numbers",
+			"watermark",
+			"protect",
+			"unlock",
+			"metadata",
+			"crop",
+		],
+	},
+	{
+		title: msg("Document cleanup & privacy"),
+		ids: ["flatten", "removeAnnots", "repair"],
 	},
 ];
 
@@ -235,6 +345,26 @@ const GUIDANCE: Record<ToolId, string> = {
 	protect: msg("Choose a PDF and set a password for the new copy."),
 	unlock: msg(
 		"Choose a locked PDF and enter its current password to save an unlocked copy.",
+	),
+	rotateAll: msg("Choose a PDF and the angle to rotate all its pages at once."),
+	reverse: msg("Choose a PDF to reverse its entire page sequence."),
+	deletePages: msg("Choose a PDF and specify the page numbers to remove."),
+	crop: msg("Choose a PDF and specify margin amounts to trim from the pages."),
+	flatten: msg(
+		"Choose a PDF to convert all form fields and annotations into permanent content.",
+	),
+	removeAnnots: msg(
+		"Choose a PDF to remove all comments, notes, ink and highlights.",
+	),
+	extractText: msg(
+		"Choose a PDF to extract its entire text content as a plain text file.",
+	),
+	blankPage: msg("Choose a PDF and where to insert clean blank pages."),
+	metadata: msg(
+		"Choose a PDF and customize its title, author, and description.",
+	),
+	repair: msg(
+		"Choose a PDF to rebuild and repair its internal document structure.",
 	),
 };
 
@@ -405,6 +535,28 @@ export function ToolsScreen({
 						)}
 						{tool === "protect" && <ProtectTool file={file} onOpen={onOpen} />}
 						{tool === "unlock" && <UnlockTool file={file} onOpen={onOpen} />}
+						{tool === "rotateAll" && (
+							<RotateAllTool file={file} onOpen={onOpen} />
+						)}
+						{tool === "reverse" && <ReverseTool file={file} onOpen={onOpen} />}
+						{tool === "deletePages" && (
+							<DeletePagesTool file={file} onOpen={onOpen} />
+						)}
+						{tool === "crop" && <CropTool file={file} onOpen={onOpen} />}
+						{tool === "flatten" && <FlattenTool file={file} onOpen={onOpen} />}
+						{tool === "removeAnnots" && (
+							<RemoveAnnotsTool file={file} onOpen={onOpen} />
+						)}
+						{tool === "extractText" && (
+							<ExtractTextTool file={file} onOpen={onOpen} />
+						)}
+						{tool === "blankPage" && (
+							<BlankPageTool file={file} onOpen={onOpen} />
+						)}
+						{tool === "metadata" && (
+							<MetadataTool file={file} onOpen={onOpen} />
+						)}
+						{tool === "repair" && <RepairTool file={file} onOpen={onOpen} />}
 					</div>
 					{tool && (
 						<p className={s.safetyNote}>
@@ -432,6 +584,447 @@ function OnePdf({
 		<>
 			<FileList kit={kit} several={false} addLabel={t("Choose a PDF")} />
 			{kit.dialog}
+		</>
+	);
+}
+
+function RotateAllTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	const [angle, setAngle] = useState<"90" | "180" | "270">("90");
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<Choice
+					label={t("Rotation angle")}
+					value={angle}
+					onChange={setAngle}
+					options={[
+						["90", t("90° Clockwise")],
+						["180", t("180° Half turn")],
+						["270", t("270° Counter-clockwise")],
+					]}
+					testId="rotate-all-angle"
+				/>
+			)}
+			{feedback}
+			<Go
+				label={t("Rotate pages")}
+				disabled={!picked}
+				running={running}
+				onClick={() =>
+					run(async () => ({
+						name: copyName(picked.name, t("rotated")),
+						bytes: await rotateAllPages(
+							picked.bytes,
+							Number(angle),
+							picked.password,
+						),
+						mime: PDF,
+					}))
+				}
+			/>
+		</>
+	);
+}
+
+function ReverseTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<p className={s.hint}>
+					{t(
+						"The pages of this document will be arranged in reverse order (last page first).",
+					)}
+				</p>
+			)}
+			{feedback}
+			<Go
+				label={t("Reverse pages")}
+				disabled={!picked}
+				running={running}
+				onClick={() =>
+					run(async () => ({
+						name: copyName(picked.name, t("reversed")),
+						bytes: await reversePdf(picked.bytes, picked.password),
+						mime: PDF,
+					}))
+				}
+			/>
+		</>
+	);
+}
+
+function DeletePagesTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	const [which, setWhich] = useState("");
+	const pages = picked?.pages ?? 0;
+	const list = picked && which.trim() ? parsePages(which, pages) : null;
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<>
+					<label className={s.label} htmlFor="tool-delete-pages">
+						{t("Pages to delete")}
+					</label>
+					<input
+						id="tool-delete-pages"
+						className={s.field}
+						value={which}
+						onChange={(e) => setWhich(e.target.value)}
+						placeholder={t("For example 1, 3-5")}
+						dir="ltr"
+						data-testid="tool-delete-pages"
+					/>
+					<p className={s.hint}>
+						{which && !list
+							? t("The document has {n} pages", { n: pages })
+							: t(
+									"The pages named will be permanently excluded from the new copy.",
+								)}
+					</p>
+				</>
+			)}
+			{feedback}
+			<Go
+				label={t("Delete pages")}
+				disabled={!picked || !list || list.length === pages}
+				running={running}
+				onClick={() =>
+					run(async () => {
+						if (!list) throw new Error("no pages");
+						return {
+							name: copyName(picked.name, t("trimmed")),
+							bytes: await deletePagesPdf(picked.bytes, list, picked.password),
+							mime: PDF,
+						};
+					})
+				}
+			/>
+		</>
+	);
+}
+
+function CropTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	const [amount, setAmount] = useState<"small" | "medium" | "large">("medium");
+	const marginsMap = {
+		small: { top: 20, bottom: 20, left: 20, right: 20 },
+		medium: { top: 40, bottom: 40, left: 40, right: 40 },
+		large: { top: 72, bottom: 72, left: 72, right: 72 },
+	};
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<Choice
+					label={t("Trim margin")}
+					value={amount}
+					onChange={setAmount}
+					options={[
+						["small", t("Slight (20pt)")],
+						["medium", t("Standard (40pt)")],
+						["large", t("Deep (1 inch)")],
+					]}
+					testId="crop-amount"
+				/>
+			)}
+			{feedback}
+			<Go
+				label={t("Crop document")}
+				disabled={!picked}
+				running={running}
+				onClick={() =>
+					run(async () => ({
+						name: copyName(picked.name, t("cropped")),
+						bytes: await cropPdf(
+							picked.bytes,
+							marginsMap[amount],
+							picked.password,
+						),
+						mime: PDF,
+					}))
+				}
+			/>
+		</>
+	);
+}
+
+function FlattenTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<p className={s.hint}>
+					{t(
+						"Permanently merges form inputs, comments, and marks into the page layers so they cannot be altered.",
+					)}
+				</p>
+			)}
+			{feedback}
+			<Go
+				label={t("Flatten PDF")}
+				disabled={!picked}
+				running={running}
+				onClick={() =>
+					run(async () => ({
+						name: copyName(picked.name, t("flattened")),
+						bytes: await flattenPdf(picked.bytes, picked.password),
+						mime: PDF,
+					}))
+				}
+			/>
+		</>
+	);
+}
+
+function RemoveAnnotsTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<p className={s.hint}>
+					{t(
+						"Strips out all interactive annotations, drawings, popups, and sticky notes from every page.",
+					)}
+				</p>
+			)}
+			{feedback}
+			<Go
+				label={t("Remove annotations")}
+				disabled={!picked}
+				running={running}
+				onClick={() =>
+					run(async () => ({
+						name: copyName(picked.name, t("clean")),
+						bytes: await removeAnnotations(picked.bytes, picked.password),
+						mime: PDF,
+					}))
+				}
+			/>
+		</>
+	);
+}
+
+function ExtractTextTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const doc = usePdf(picked);
+	const { running, run, feedback } = useRun(onOpen);
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<p className={s.hint}>
+					{t(
+						"Pulls all embedded plain text out of each page and saves it as a standard .txt document.",
+					)}
+				</p>
+			)}
+			{feedback}
+			<Go
+				label={t("Extract text")}
+				disabled={!picked || !doc}
+				running={running}
+				onClick={() =>
+					run(async () => {
+						if (!doc) throw new Error("no doc");
+						const total = doc.numPages;
+						const lines: string[] = [];
+						for (let i = 1; i <= total; i++) {
+							const page = await doc.getPage(i);
+							const content = await page.getTextContent();
+							const pageStr = content.items
+								.map((item) => ("str" in item ? item.str : ""))
+								.join(" ");
+							lines.push(`--- Page ${i} ---\n${pageStr}\n`);
+						}
+						const textData = lines.join("\n");
+						const bytes = new TextEncoder().encode(textData);
+						return {
+							name: copyName(picked.name, t("text"), ".txt"),
+							bytes,
+							mime: "text/plain",
+						};
+					})
+				}
+			/>
+		</>
+	);
+}
+
+function BlankPageTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	const [position, setPosition] = useState<"end" | "start" | "between">("end");
+	const [size, setSize] = useState<"a4" | "letter" | "fit">("fit");
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<>
+					<Choice
+						label={t("Placement")}
+						value={position}
+						onChange={setPosition}
+						options={[
+							["end", t("At the end")],
+							["start", t("At the beginning")],
+							["between", t("Between every page")],
+						]}
+						testId="blank-page-position"
+					/>
+					<Choice
+						label={t("Page size")}
+						value={size}
+						onChange={setSize}
+						options={[
+							["fit", t("Match document")],
+							["a4", "A4"],
+							["letter", "Letter"],
+						]}
+						testId="blank-page-size"
+					/>
+				</>
+			)}
+			{feedback}
+			<Go
+				label={t("Insert blank page")}
+				disabled={!picked}
+				running={running}
+				onClick={() =>
+					run(async () => ({
+						name: copyName(picked.name, t("expanded")),
+						bytes: await blankPagePdf(
+							picked.bytes,
+							{ position, size },
+							picked.password,
+						),
+						mime: PDF,
+					}))
+				}
+			/>
+		</>
+	);
+}
+
+function MetadataTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	const [title, setTitle] = useState("");
+	const [author, setAuthor] = useState("");
+	const [subject, setSubject] = useState("");
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<>
+					<label className={s.label} htmlFor="meta-title">
+						{t("Title")}
+					</label>
+					<input
+						id="meta-title"
+						className={s.field}
+						value={title}
+						onChange={(e) => setTitle(e.target.value)}
+						placeholder={picked.name}
+						data-testid="meta-title"
+					/>
+					<label className={s.label} htmlFor="meta-author">
+						{t("Author")}
+					</label>
+					<input
+						id="meta-author"
+						className={s.field}
+						value={author}
+						onChange={(e) => setAuthor(e.target.value)}
+						placeholder={t("Author name")}
+						data-testid="meta-author"
+					/>
+					<label className={s.label} htmlFor="meta-subject">
+						{t("Subject / Description")}
+					</label>
+					<input
+						id="meta-subject"
+						className={s.field}
+						value={subject}
+						onChange={(e) => setSubject(e.target.value)}
+						placeholder={t("Document subject")}
+						data-testid="meta-subject"
+					/>
+				</>
+			)}
+			{feedback}
+			<Go
+				label={t("Update metadata")}
+				disabled={!picked}
+				running={running}
+				onClick={() =>
+					run(async () => ({
+						name: copyName(picked.name, t("metadata")),
+						bytes: await pdfMetadata(
+							picked.bytes,
+							{
+								title: title.trim() || undefined,
+								author: author.trim() || undefined,
+								subject: subject.trim() || undefined,
+							},
+							picked.password,
+						),
+						mime: PDF,
+					}))
+				}
+			/>
+		</>
+	);
+}
+
+function RepairTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("pdf", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	return (
+		<>
+			<OnePdf kit={kit} />
+			{picked && (
+				<p className={s.hint}>
+					{t(
+						"Re-reads and re-constructs every object in the PDF, fixing invalid xref tables, corrupted trailer dictionaries, and stream anomalies.",
+					)}
+				</p>
+			)}
+			{feedback}
+			<Go
+				label={t("Repair PDF")}
+				disabled={!picked}
+				running={running}
+				onClick={() =>
+					run(async () => ({
+						name: copyName(picked.name, t("repaired")),
+						bytes: await repairPdf(picked.bytes, picked.password),
+						mime: PDF,
+					}))
+				}
+			/>
 		</>
 	);
 }
