@@ -7,7 +7,6 @@ import { type Chart, readChart } from "@/lib/pptx/chart";
 import { hintFor } from "@/lib/shortcuts";
 
 import { CellStore, packCells } from "@/lib/cellPack";
-import type { GridCell } from "@/lib/workbookModel";
 import type { PackedParseResult } from "@/lib/parseWorker";
 import {
 	DEFAULT_COL_WIDTH,
@@ -18,6 +17,7 @@ import {
 	computeVisibleWindow,
 } from "@/lib/sheetLayout";
 import { ENCODINGS, decodeText } from "@/lib/text";
+import type { GridCell } from "@/lib/workbookModel";
 import type { CellStyle, GridObject } from "@/lib/workbookModel";
 import { useSettings } from "@/state/settings";
 import {
