@@ -55,7 +55,6 @@ import { ShortcutList } from "./ShortcutList";
 import { WhatsNew } from "./WhatsNew";
 
 const VERSION = import.meta.env.VITE_APP_VERSION ?? "dev";
-const CONTACT = "saqlainrazee@gmail.com";
 const PRIVACY_POLICY = "razee4315.github.io/Paperwren/privacy";
 
 /** Put a value on the clipboard and say so; where there is no
@@ -408,7 +407,7 @@ export function SettingsScreen() {
 								</span>
 								<span className={s.fieldHint}>
 									{t(
-										"The language of Paperwren's own buttons and messages. Your documents are shown as they are.",
+										"The language of Sark Docs' own buttons and messages. Your documents are shown as they are.",
 									)}
 								</span>
 								<div
@@ -776,10 +775,10 @@ export function SettingsScreen() {
 											<p>
 												{sharesFrame
 													? t(
-															"To open documents with Paperwren by a double-click, select one in Finder, choose File, then Get Info, and pick Paperwren under Open with.",
+															"To open documents with Sark Docs by a double-click, select one in Finder, choose File, then Get Info, and pick Sark Docs under Open with.",
 														)
 													: t(
-															"To open documents with Paperwren by a double-click, choose it in Windows Settings, under Apps, Default apps.",
+															"To open documents with Sark Docs by a double-click, choose it in Windows Settings, under Apps, Default apps.",
 														)}
 											</p>
 										</div>
@@ -797,7 +796,7 @@ export function SettingsScreen() {
 									<Switch
 										label={t("Check for updates automatically")}
 										hint={t(
-											"When it starts, Paperwren asks GitHub for a new version.",
+											"When it starts, Sark Docs asks GitHub for a new version.",
 										)}
 										checked={settings.updates === "auto"}
 										onChange={(v) => update("updates", v ? "auto" : "off")}
@@ -835,10 +834,10 @@ export function SettingsScreen() {
 								<p>
 									{canUpdate
 										? t(
-												"Paperwren goes online only to check for updates, and only if you allow it. It has no ads, no accounts and no analytics, and it asks for no permissions.",
+												"Sark Docs goes online only to check for updates, and only if you allow it. It has no ads, no accounts and no analytics, and it asks for no permissions.",
 											)
 										: t(
-												"Paperwren never connects to the internet. It has no ads, no accounts and no analytics, and it asks for no permissions.",
+												"Sark Docs never connects to the internet. It has no ads, no accounts and no analytics, and it asks for no permissions.",
 											)}
 								</p>
 								<p>
@@ -871,7 +870,7 @@ export function SettingsScreen() {
 						</Group>
 						<div className={s.card}>
 							<div className={s.action}>
-								<span className={s.actionText}>Paperwren</span>
+								<span className={s.actionText}>Sark Docs</span>
 								<span className={s.version}>v{VERSION}</span>
 							</div>
 							<button
@@ -881,17 +880,6 @@ export function SettingsScreen() {
 								data-testid="whats-new-open"
 							>
 								<span className={s.actionText}>{t("What's new")}</span>
-							</button>
-							<button
-								type="button"
-								className={s.action}
-								onClick={() => copy(CONTACT, t("Email address copied"))}
-							>
-								<span className={s.actionText}>
-									{t("Contact")}
-									<span className={s.hint}>{CONTACT}</span>
-								</span>
-								<Copy size={18} aria-label={t("Copy email address")} />
 							</button>
 							<button
 								type="button"

@@ -77,12 +77,12 @@ export function UpdateHost({ paused }: { paused: boolean }) {
 				}
 			>
 				{t(
-					"When it starts, Paperwren can ask GitHub whether a new version is out. Nothing about you or your files is sent. You can change this in Settings.",
+					"When it starts, Sark Docs can ask GitHub whether a new version is out. Nothing about you or your files is sent. You can change this in Settings.",
 				)}
 			</Dialog>
 			<Dialog
 				open={offered !== null}
-				title={t("Paperwren {version} is available", {
+				title={t("Sark Docs {version} is available", {
 					version: offered?.version ?? "",
 				})}
 				onClose={() => !installing && dismissUpdate()}
@@ -116,7 +116,7 @@ export function UpdateHost({ paused }: { paused: boolean }) {
 					</p>
 				) : (
 					// One line: what changed is in What's new, once it is installed.
-					<p>{t("A new version of Paperwren is ready to install.")}</p>
+					<p>{t("A new version of Sark Docs is ready to install.")}</p>
 				)}
 			</Dialog>
 		</>

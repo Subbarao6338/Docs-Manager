@@ -170,7 +170,7 @@ export function FolderList({
 			<div className={s.noMatch} data-testid="folder-failed">
 				<FolderX size={36} strokeWidth={1.5} />
 				{t(
-					"Paperwren can't reach “{name}” any more. It may have been moved, or access to it was withdrawn.",
+					"Sark Docs can't reach “{name}” any more. It may have been moved, or access to it was withdrawn.",
 					{ name: folder.name },
 				)}
 				<div className={s.placeActions}>
@@ -262,7 +262,7 @@ export function FolderList({
 						<RefreshCw size={18} />
 					</IconButton>
 					<IconButton
-						label={t("Remove this folder from Paperwren")}
+						label={t("Remove this folder from Sark Docs")}
 						onClick={onRemove}
 						data-testid="folder-remove"
 					>

@@ -75,7 +75,7 @@ function CustomizeScene() {
 
 const STEPS = [
 	{
-		title: msg("Meet Paperwren"),
+		title: msg("Meet Sark Docs"),
 		body: msg("The small, quiet way to open every document on your device."),
 		Scene: HelloScene,
 	},
@@ -146,7 +146,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 			// biome-ignore lint/a11y/useSemanticElements: a full-screen surface, not a native dialog
 			role="dialog"
 			aria-modal="true"
-			aria-label={t("Meet Paperwren")}
+			aria-label={t("Meet Sark Docs")}
 			data-testid="onboarding"
 			onPointerDown={(e) => {
 				drag.current = { x: e.clientX, y: e.clientY };

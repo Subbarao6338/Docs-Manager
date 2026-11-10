@@ -40,7 +40,7 @@ export interface ToolFile {
 let keys = 0;
 
 /** What the tools take in. */
-export type Takes = "pdf" | "image" | "any";
+export type Takes = "pdf" | "image" | "any" | "all";
 
 /** Ask for a PDF's password until it opens or the reader gives up. */
 function usePassword() {
@@ -104,6 +104,7 @@ export function useToolFiles(takes: Takes, initial?: OpenRequest) {
 					toast(t("{name} isn't a PDF or a picture", { name: request.name }));
 					return;
 				}
+				// "all" accepts all document types (txt, md, mdx, csv, tsv, parquet, xlsx, pptx, docx, json, etc.)
 				const file: ToolFile = { key: ++keys, name: request.name, bytes };
 				if (format === "pdf" && takes !== "image") {
 					let tried: string | undefined;

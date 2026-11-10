@@ -43,6 +43,7 @@ Object.assign(VIEWERS, {
 	xls: sheet,
 	ods: sheet,
 	csv: sheet,
+	parquet: sheet,
 	pptx: slides,
 	ppt: slides,
 	odp: slides,
@@ -102,7 +103,7 @@ class ViewerBoundary extends Component<
 				actions={<Button onClick={this.props.onClose}>{t("OK")}</Button>}
 			>
 				{t(
-					"“{name}” contains something Paperwren can't draw. The file itself is untouched.",
+					"“{name}” contains something Sark Docs can't draw. The file itself is untouched.",
 					{ name: this.props.name },
 				)}
 			</Dialog>

@@ -599,8 +599,8 @@ export function Shell({
 	// The window is named after the document, as in every desktop reader.
 	useEffect(() => {
 		if (!active) return;
-		backend.setTitle(`${name} - Paperwren`);
-		return () => backend.setTitle("Paperwren");
+		backend.setTitle(`${name} - Sark Docs`);
+		return () => backend.setTitle("Sark Docs");
 	}, [active, name]);
 
 	// The button that opened the document (on Home, now underneath) lets

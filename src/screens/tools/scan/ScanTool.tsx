@@ -2,12 +2,12 @@ import { backend } from "@/lib/backend";
 import { isDesktop, isTouch } from "@/lib/env";
 import { unreadNote } from "@/lib/errors";
 import { t, tn } from "@/lib/i18n";
-import { SCAN_MARK, scansToPdf } from "@/lib/pdfTools";
+import { scansToPdf } from "@/lib/pdfTools";
 import { findPage, warmUp } from "@/lib/scan/detect";
 import { scaleQuad } from "@/lib/scan/geometry";
 import { ScanJob, decodePhoto, photoScale } from "@/lib/scan/job";
 import type { OpenRequest } from "@/lib/types";
-import { Button, IconButton, Switch, toast } from "@/ui";
+import { Button, IconButton, toast } from "@/ui";
 import {
 	ArrowLeft,
 	ArrowRight,
@@ -47,15 +47,6 @@ interface ScanPage extends PageSetup {
 }
 
 let keys = 0;
-const MARK_KEY = "paperwren.scanMark";
-
-function markSetting(): boolean {
-	try {
-		return localStorage.getItem(MARK_KEY) !== "off";
-	} catch {
-		return true;
-	}
-}
 
 /** "Scan 2026-10-18 14.05.pdf", in the reader's language. */
 function scanName(): string {
@@ -89,20 +80,10 @@ export function ScanTool({
 		initial?: PageSetup;
 	} | null>(null);
 	const [paper, setPaper] = useState<"fit" | "a4" | "letter">("fit");
-	const [mark, setMarkState] = useState(markSetting);
 	const { running, run, feedback } = useRun(onOpen);
 	const camera = useRef<HTMLInputElement>(null);
 	const photos = useRef<HTMLInputElement>(null);
 	const queue = useRef<Promise<unknown>>(Promise.resolve());
-
-	const setMark = (on: boolean) => {
-		setMarkState(on);
-		try {
-			localStorage.setItem(MARK_KEY, on ? "on" : "off");
-		} catch {
-			// Not remembered: on again next time.
-		}
-	};
 
 	const update = useCallback(
 		(key: number, change: (page: ScanPage) => Partial<ScanPage> | null) =>
@@ -299,7 +280,7 @@ export function ScanTool({
 				name: scanName(),
 				bytes: await scansToPdf(scans, {
 					paper,
-					mark: mark ? SCAN_MARK : undefined,
+					mark: undefined,
 				}),
 				mime: "application/pdf",
 			};
@@ -503,17 +484,6 @@ export function ScanTool({
 							]}
 							testId="scan-paper"
 						/>
-						<div className={s.markRow}>
-							<Switch
-								label={t("Add “Scanned with Paperwren”")}
-								hint={t(
-									"A small grey line at the foot of each page. Turn it off for a clean page.",
-								)}
-								checked={mark}
-								onChange={setMark}
-								testId="scan-mark"
-							/>
-						</div>
 					</div>
 				</>
 			)}

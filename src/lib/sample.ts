@@ -6,7 +6,7 @@
 
 const PAGES = [
 	{
-		title: "Welcome to Paperwren",
+		title: "Welcome to Sark Docs",
 		lines: [
 			"This is a sample document. Try things out on it; nothing here can break.",
 			"",
@@ -38,7 +38,7 @@ export async function samplePdf(): Promise<Uint8Array> {
 	const { PDFDocument, StandardFonts, rgb } = await import("@cantoo/pdf-lib");
 	// No dates: the same bytes each time, so marks on it come back.
 	const doc = await PDFDocument.create({ updateMetadata: false });
-	doc.setTitle("Welcome to Paperwren");
+	doc.setTitle("Welcome to Sark Docs");
 	const body = await doc.embedFont(StandardFonts.Helvetica);
 	const bold = await doc.embedFont(StandardFonts.HelveticaBold);
 	for (const { title, lines } of PAGES) {

@@ -343,7 +343,7 @@ export default function ReflowView(props: ViewerProps) {
 						: explainFailure(
 								fault,
 								t(
-									"The file is damaged or uses a variant Paperwren can't read.",
+									"The file is damaged or uses a variant Sark Docs can't read.",
 								),
 							)}
 				</StateView>
