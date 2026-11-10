@@ -2,7 +2,7 @@
   "name": "sark.docs",
   "productName": "Sark Docs Manager",
   "private": true,
-  "version": "1.6.2",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

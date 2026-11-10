@@ -2799,7 +2799,7 @@ dependencies = [
 
 [[package]]
 name = "sark-docs-manager"
-version = "1.6.2"
+version = "0.0.1"
 dependencies = [
  "serde",
  "serde_json",

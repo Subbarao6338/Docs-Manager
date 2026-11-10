@@ -29,7 +29,7 @@ jobs:
       - name: Calculate Version
         id: ver
         run: |
-          VERSION="2.0.${{ github.run_number }}"
+          VERSION="0.0.${{ github.run_number }}"
           echo "Computed version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -42,7 +42,7 @@ jobs:
         run: |
           NOTES_FILE="$RUNNER_TEMP/release_notes.md"
           cat << 'EOF' > "$NOTES_FILE"
-          ### Sark Docs Manager v2.0.${{ github.run_number }}
+          ### Sark Docs Manager v0.0.${{ github.run_number }}
           **The Ultimate Documents Solution** - Creation, Viewing, Editing, Tools, and Document Management.
 
           #### Highlights & What's New:
@@ -98,6 +98,10 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
 
+      - name: Generate app icons
+        run: |
+          npx tauri icon assets/brand/app-icon.svg --output src-tauri/icons
+
       - name: Build Windows Variant
         run: npx tauri build
 
@@ -150,6 +154,10 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
+
+      - name: Generate app icons
+        run: |
+          npx tauri icon assets/brand/app-icon.svg --output src-tauri/icons
 
       - name: Build Linux Targets (deb, appimage, rpm)
         run: npx tauri build --bundles appimage,deb,rpm
@@ -244,10 +252,22 @@ jobs:
               -dname "CN=Sark Docs Manager, OU=Sark, O=Sark, L=Default, S=Default, C=US"
           fi
 
-      - name: Initialize & configure Android
+      - name: Generate app icons
         run: |
-          npx tauri android init
+          npx tauri icon assets/brand/app-icon.svg --output src-tauri/icons
+          npx tauri icon assets/brand/app-icon-foreground.svg --output .tauri-icons-android
+
+      - name: Initialize Android project
+        run: npx tauri android init
+
+      - name: Patch generated Android project
+        run: |
+          node scripts/patch-android-signing.mjs
+          node scripts/patch-android-icons.mjs
           node scripts/install-android.mjs
+
+      - name: Configure release signing
+        run: |
           mkdir -p src-tauri/gen/android
           {
             echo "storeFile=$HOME/.android/sark-release.keystore"
