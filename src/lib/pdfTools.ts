@@ -1009,3 +1009,236 @@ export async function addTextLayer(
 	}
 	return doc.save({ updateFieldAppearances: false });
 }
+
+/**
+ * Rotate every page of a PDF by a given angle in degrees clockwise (e.g. 90, 180, 270).
+ */
+export async function rotateAllPages(
+	bytes: Uint8Array,
+	angle: number,
+	password?: string,
+): Promise<Uint8Array> {
+	const { degrees } = await lib();
+	const doc = await open(bytes, password);
+	const count = doc.getPageCount();
+	if (count === 0) throw new ToolError("empty");
+	for (const page of doc.getPages()) {
+		const current = page.getRotation().angle;
+		page.setRotation(degrees((((current + angle) % 360) + 360) % 360));
+	}
+	return doc.save();
+}
+
+/**
+ * Reverse the order of pages in a document.
+ */
+export async function reversePdf(
+	bytes: Uint8Array,
+	password?: string,
+): Promise<Uint8Array> {
+	const doc = await open(bytes, password);
+	const count = doc.getPageCount();
+	if (count === 0) throw new ToolError("empty");
+	const picks: PagePick[] = Array.from({ length: count }, (_, i) => ({
+		file: 0,
+		page: count - 1 - i,
+	}));
+	return buildPdf([{ bytes, password }], picks);
+}
+
+/**
+ * Delete specified 0-based page numbers from a document.
+ */
+export async function deletePagesPdf(
+	bytes: Uint8Array,
+	toDelete: number[],
+	password?: string,
+): Promise<Uint8Array> {
+	const doc = await open(bytes, password);
+	const count = doc.getPageCount();
+	if (count === 0) throw new ToolError("empty");
+	const deleteSet = new Set(toDelete);
+	const picks: PagePick[] = [];
+	for (let i = 0; i < count; i++) {
+		if (!deleteSet.has(i)) {
+			picks.push({ file: 0, page: i });
+		}
+	}
+	if (!picks.length) throw new ToolError("empty");
+	return buildPdf([{ bytes, password }], picks);
+}
+
+/**
+ * Margins to crop from each edge, in points.
+ */
+export interface CropMargins {
+	top: number;
+	bottom: number;
+	left: number;
+	right: number;
+}
+
+/**
+ * Crop pages by reducing crop and media boxes by specified margins in points.
+ */
+export async function cropPdf(
+	bytes: Uint8Array,
+	margins: CropMargins,
+	password?: string,
+): Promise<Uint8Array> {
+	const doc = await open(bytes, password);
+	const count = doc.getPageCount();
+	if (count === 0) throw new ToolError("empty");
+	for (const page of doc.getPages()) {
+		const box = page.getCropBox();
+		const newX = box.x + margins.left;
+		const newY = box.y + margins.bottom;
+		const newW = box.width - margins.left - margins.right;
+		const newH = box.height - margins.top - margins.bottom;
+		if (newW <= 10 || newH <= 10) {
+			throw new ToolError("corrupt", "Crop margins exceed page dimensions");
+		}
+		page.setCropBox(newX, newY, newW, newH);
+	}
+	return doc.save();
+}
+
+/**
+ * Flatten all form fields and annotations into the page content.
+ */
+export async function flattenPdf(
+	bytes: Uint8Array,
+	password?: string,
+): Promise<Uint8Array> {
+	const { StandardFonts } = await lib();
+	const doc = await open(bytes, password);
+	const font = await doc.embedFont(StandardFonts.Helvetica);
+	const form = doc.getForm();
+	try {
+		form.updateFieldAppearances(font);
+	} catch {
+		// Field appearances might already be up to date
+	}
+	try {
+		form.flatten();
+	} catch {
+		// If no fields to flatten, continue
+	}
+	return doc.save({ updateFieldAppearances: false });
+}
+
+/**
+ * Remove all annotations from all pages of the document.
+ */
+export async function removeAnnotations(
+	bytes: Uint8Array,
+	password?: string,
+): Promise<Uint8Array> {
+	const { PDFName } = await lib();
+	const doc = await open(bytes, password);
+	const count = doc.getPageCount();
+	if (count === 0) throw new ToolError("empty");
+	const keyAnnots = PDFName.of("Annots");
+	for (const page of doc.getPages()) {
+		if (page.node.has(keyAnnots)) {
+			page.node.delete(keyAnnots);
+		}
+	}
+	return doc.save({ updateFieldAppearances: false });
+}
+
+/**
+ * Insert blank page(s) into the PDF at a specified location.
+ */
+export async function blankPagePdf(
+	bytes: Uint8Array,
+	{
+		position = "end",
+		size = "a4",
+		count = 1,
+	}: {
+		position?: "start" | "end" | "between";
+		size?: "a4" | "letter" | "fit";
+		count?: number;
+	} = {},
+	password?: string,
+): Promise<Uint8Array> {
+	const doc = await open(bytes, password);
+	const total = doc.getPageCount();
+	if (total === 0) throw new ToolError("empty");
+	const firstPageSize = doc.getPage(0).getSize();
+	const [w, h] =
+		size === "a4"
+			? PAPER.a4
+			: size === "letter"
+				? PAPER.letter
+				: [firstPageSize.width, firstPageSize.height];
+
+	if (position === "start") {
+		for (let i = 0; i < count; i++) {
+			doc.insertPage(0, [w, h]);
+		}
+	} else if (position === "end") {
+		for (let i = 0; i < count; i++) {
+			doc.addPage([w, h]);
+		}
+	} else if (position === "between") {
+		// Insert after each page except the last
+		let offset = 1;
+		for (let i = 0; i < total - 1; i++) {
+			for (let c = 0; c < count; c++) {
+				doc.insertPage(offset, [w, h]);
+				offset++;
+			}
+			offset++;
+		}
+	}
+	return doc.save();
+}
+
+/**
+ * Update document metadata: title, author, subject, keywords, creator.
+ */
+export interface DocumentMetadata {
+	title?: string;
+	author?: string;
+	subject?: string;
+	keywords?: string[];
+	creator?: string;
+	producer?: string;
+}
+
+export async function pdfMetadata(
+	bytes: Uint8Array,
+	meta: DocumentMetadata,
+	password?: string,
+): Promise<Uint8Array> {
+	const doc = await open(bytes, password);
+	if (meta.title !== undefined) doc.setTitle(meta.title);
+	if (meta.author !== undefined) doc.setAuthor(meta.author);
+	if (meta.subject !== undefined) doc.setSubject(meta.subject);
+	if (meta.keywords !== undefined) doc.setKeywords(meta.keywords);
+	if (meta.creator !== undefined) doc.setCreator(meta.creator);
+	if (meta.producer !== undefined) doc.setProducer(meta.producer);
+	return doc.save();
+}
+
+/**
+ * Re-parse and reconstruct PDF structure to repair or clean corrupted structures.
+ */
+export async function repairPdf(
+	bytes: Uint8Array,
+	password?: string,
+): Promise<Uint8Array> {
+	const doc = await open(bytes, password);
+	const count = doc.getPageCount();
+	if (count === 0) throw new ToolError("empty");
+	const { PDFDocument } = await lib();
+	const out = await PDFDocument.create();
+	const pageIndexes = Array.from({ length: count }, (_, i) => i);
+	const copied = await out.copyPages(doc, pageIndexes);
+	for (const page of copied) {
+		out.addPage(page);
+	}
+	return out.save({ useObjectStreams: true });
+}
