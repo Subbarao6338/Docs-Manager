@@ -654,7 +654,9 @@ function ConvertTool({ file, onOpen }: ToolProps) {
 			{picked && targets.length > 0 && (
 				<Choice
 					label={t("Convert to")}
-					options={targets.map((tg) => [tg.id, tg.label] as [ConvertTarget, string])}
+					options={targets.map(
+						(tg) => [tg.id, tg.label] as [ConvertTarget, string],
+					)}
 					value={target}
 					onChange={(val) => setTarget(val as ConvertTarget)}
 					testId="tool-convert-target"
