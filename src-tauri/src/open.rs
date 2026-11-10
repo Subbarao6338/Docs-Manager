@@ -15,7 +15,7 @@ use crate::error::{AppError, AppResult, ErrorKind};
 /// Extensions of the documents Paperwren opens (lowercase).
 pub const DOCUMENT_EXTENSIONS: &[&str] = &[
     "pdf", "docx", "docm", "dotx", "doc", "odt", "rtf", "epub", "xlsx", "xlsm", "xlsb", "xltx",
-    "xls", "ods", "csv", "tsv", "pptx", "pptm", "ppsx", "ppt", "pps", "odp", "md", "markdown",
+    "xls", "ods", "csv", "tsv", "parquet", "pq", "pptx", "pptm", "ppsx", "ppt", "pps", "odp", "md", "mdx", "markdown",
     "txt", "text", "log", "json", "xml", "yml", "yaml", "ini", "png", "jpg", "jpeg", "gif", "webp",
     "bmp", "svg", "avif", "heic", "heif", "tif", "tiff", "cbz", "jsx", "ts", "tsx", "go", "rs",
     "java", "kt", "kts", "swift", "c", "h", "cpp", "cc", "hpp", "cs", "sql", "css", "scss", "less",

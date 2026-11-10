@@ -683,7 +683,7 @@ export default function ImageView({
 						: explainFailure(
 								fault,
 								t(
-									"The file is damaged or isn't a picture format Paperwren shows.",
+									"The file is damaged or isn't a picture format Sark Docs shows.",
 								),
 							)}
 				</StateView>

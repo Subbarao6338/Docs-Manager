@@ -1,4 +1,9 @@
 import { formatBytes } from "@/lib/backend";
+import {
+	type ConvertTarget,
+	convertDocument,
+	getAvailableTargets,
+} from "@/lib/converter";
 import { contentKey, fileSample } from "@/lib/docMarks";
 import { unreadNote } from "@/lib/errors";
 import { copyName, splitName } from "@/lib/fileName";
@@ -32,14 +37,18 @@ import {
 	unlock,
 } from "@/lib/pdfTools";
 import { sniffFormat } from "@/lib/sniff";
+import { decodeText } from "@/lib/text";
 import type { OpenRequest } from "@/lib/types";
 import { useBackClose, useNav } from "@/state/navigation";
 import { Button, IconButton, toast } from "@/ui";
 import { zipSync } from "fflate";
 import {
 	ArrowLeft,
+	ArrowLeftRight,
 	ArrowRight,
 	ArrowUpDown,
+	BarChart2,
+	Braces,
 	Camera,
 	Check,
 	Combine,
@@ -92,6 +101,9 @@ import { announceSaved } from "./saved";
 import { ScanTool } from "./scan/ScanTool";
 
 export type ToolId =
+	| "convert"
+	| "stats"
+	| "formatData"
 	| "sign"
 	| "scan"
 	| "markup"
@@ -126,6 +138,24 @@ const TOOLS: Array<{
 	title: string;
 	hint: string;
 }> = [
+	{
+		id: "convert",
+		icon: <ArrowLeftRight size={22} />,
+		title: msg("Document converter"),
+		hint: msg("Convert documents, spreadsheets, text, and images"),
+	},
+	{
+		id: "stats",
+		icon: <BarChart2 size={22} />,
+		title: msg("Document statistics"),
+		hint: msg("Word count, character count, and reading metrics"),
+	},
+	{
+		id: "formatData",
+		icon: <Braces size={22} />,
+		title: msg("Format & validate data"),
+		hint: msg("Beautify, format, and validate JSON or data"),
+	},
 	{
 		id: "sign",
 		icon: <PenLine size={22} />,
@@ -287,7 +317,16 @@ const GROUPS = [
 	},
 	{
 		title: msg("Convert your files"),
-		ids: ["ocr", "compress", "images", "pictures", "extractText"],
+		ids: [
+			"convert",
+			"stats",
+			"formatData",
+			"ocr",
+			"compress",
+			"images",
+			"pictures",
+			"extractText",
+		],
 	},
 	{
 		title: msg("Add the finishing touches"),
@@ -308,6 +347,15 @@ const GROUPS = [
 ];
 
 const GUIDANCE: Record<ToolId, string> = {
+	convert: msg(
+		"Choose any document, spreadsheet, data file or image, choose target format, and save the converted file.",
+	),
+	stats: msg(
+		"Choose any document or text file to analyze word count, character count, lines, and reading time.",
+	),
+	formatData: msg(
+		"Validate, format, prettify, or minify JSON data, spreadsheets, and structured text.",
+	),
 	sign: msg(
 		"Choose your PDF, add your details and signature, then save a copy.",
 	),
@@ -513,6 +561,11 @@ export function ToolsScreen({
 						</div>
 					)}
 					<div className={tool ? s.taskPanel : undefined}>
+						{tool === "convert" && <ConvertTool file={file} onOpen={onOpen} />}
+						{tool === "stats" && <StatsTool file={file} onOpen={onOpen} />}
+						{tool === "formatData" && (
+							<FormatDataTool file={file} onOpen={onOpen} />
+						)}
 						{tool === "sign" && <SignTool file={file} onOpen={onOpen} />}
 						{tool === "scan" && <ScanTool file={file} onOpen={onOpen} />}
 						{tool === "markup" && <MarkUpTool file={file} onOpen={onOpen} />}
@@ -573,6 +626,222 @@ export function ToolsScreen({
 interface ToolProps {
 	file?: OpenRequest;
 	onOpen: (request: OpenRequest) => void;
+}
+
+function ConvertTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("all", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	const targets = useMemo(
+		() => (picked ? getAvailableTargets(picked.name) : []),
+		[picked],
+	);
+	const [target, setTarget] = useState<ConvertTarget>("pdf");
+
+	useEffect(() => {
+		if (targets.length > 0 && !targets.some((t) => t.id === target)) {
+			setTarget(targets[0].id);
+		}
+	}, [targets, target]);
+
+	return (
+		<>
+			<FileList
+				kit={kit}
+				several={false}
+				addLabel={t("Choose any document or file")}
+			/>
+			{picked && targets.length > 0 && (
+				<Choice
+					label={t("Convert to")}
+					options={targets.map((tg) => [tg.id, tg.label] as [ConvertTarget, string])}
+					value={target}
+					onChange={(val) => setTarget(val as ConvertTarget)}
+					testId="tool-convert-target"
+				/>
+			)}
+			{feedback}
+			<Go
+				label={t("Convert & Save")}
+				disabled={!picked || targets.length === 0}
+				running={running}
+				onClick={() =>
+					run(async () => {
+						const res = await convertDocument(
+							picked.bytes.buffer as ArrayBuffer,
+							picked.name,
+							target,
+						);
+						return {
+							name: res.filename,
+							bytes: res.data,
+							mime: res.mime,
+						};
+					})
+				}
+			/>
+		</>
+	);
+}
+
+function StatsTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("all", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+
+	const stats = useMemo(() => {
+		if (!picked) return null;
+		const text = decodeText(picked.bytes.buffer as ArrayBuffer);
+		const chars = text.length;
+		const charsNoSpace = text.replace(/\s+/g, "").length;
+		const words = (text.match(/[\p{L}\p{N}_]+/gu) || []).length;
+		const lines = text.split(/\r?\n/).length;
+		const paragraphs = text
+			.split(/\n\s*\n/)
+			.filter((p) => p.trim().length > 0).length;
+		const readingTimeMinutes = Math.max(1, Math.ceil(words / 200));
+
+		return {
+			chars,
+			charsNoSpace,
+			words,
+			lines,
+			paragraphs,
+			readingTimeMinutes,
+		};
+	}, [picked]);
+
+	return (
+		<>
+			<FileList
+				kit={kit}
+				several={false}
+				addLabel={t("Choose a document to analyze")}
+			/>
+			{stats && (
+				<div style={{ marginTop: "1rem", display: "grid", gap: "0.75rem" }}>
+					<div className={s.choiceItem}>
+						<strong>{t("Words")}:</strong>{" "}
+						<span>{stats.words.toLocaleString()}</span>
+					</div>
+					<div className={s.choiceItem}>
+						<strong>{t("Characters (with spaces)")}:</strong>{" "}
+						<span>{stats.chars.toLocaleString()}</span>
+					</div>
+					<div className={s.choiceItem}>
+						<strong>{t("Characters (no spaces)")}:</strong>{" "}
+						<span>{stats.charsNoSpace.toLocaleString()}</span>
+					</div>
+					<div className={s.choiceItem}>
+						<strong>{t("Lines")}:</strong>{" "}
+						<span>{stats.lines.toLocaleString()}</span>
+					</div>
+					<div className={s.choiceItem}>
+						<strong>{t("Paragraphs")}:</strong>{" "}
+						<span>{stats.paragraphs.toLocaleString()}</span>
+					</div>
+					<div className={s.choiceItem}>
+						<strong>{t("Estimated reading time")}:</strong>{" "}
+						<span>{t("{m} min", { m: stats.readingTimeMinutes })}</span>
+					</div>
+				</div>
+			)}
+			{feedback}
+			{stats && (
+				<Go
+					label={t("Save statistics report")}
+					disabled={!picked}
+					running={running}
+					onClick={() =>
+						run(async () => {
+							const report = `Document Statistics Report
+File: ${picked.name}
+Words: ${stats.words}
+Characters: ${stats.chars}
+Characters (no spaces): ${stats.charsNoSpace}
+Lines: ${stats.lines}
+Paragraphs: ${stats.paragraphs}
+Reading Time: ~${stats.readingTimeMinutes} min
+Generated by Sark Docs Manager
+`;
+							return {
+								name: copyName(picked.name, "stats.txt"),
+								bytes: new TextEncoder().encode(report),
+								mime: "text/plain",
+							};
+						})
+					}
+				/>
+			)}
+		</>
+	);
+}
+
+function FormatDataTool({ file, onOpen }: ToolProps) {
+	const kit = useToolFiles("all", file);
+	const picked = kit.files[0];
+	const { running, run, feedback } = useRun(onOpen);
+	const [mode, setMode] = useState<"pretty" | "minify">("pretty");
+	const [error, setError] = useState<string | null>(null);
+
+	return (
+		<>
+			<FileList
+				kit={kit}
+				several={false}
+				addLabel={t("Choose JSON or structured data")}
+			/>
+			{picked && (
+				<>
+					<Choice
+						label={t("Formatting mode")}
+						options={[
+							["pretty", t("Prettify / Beautify (Indent 2 spaces)")],
+							["minify", t("Minify (Compact single line)")],
+						]}
+						value={mode}
+						onChange={(m) => setMode(m as "pretty" | "minify")}
+						testId="tool-format-mode"
+					/>
+					{error && (
+						<p className={s.hint} style={{ color: "var(--pw-danger)" }}>
+							{error}
+						</p>
+					)}
+				</>
+			)}
+			{feedback}
+			<Go
+				label={t("Format & Save")}
+				disabled={!picked}
+				running={running}
+				onClick={() =>
+					run(async () => {
+						setError(null);
+						const text = decodeText(picked.bytes.buffer as ArrayBuffer);
+						try {
+							const parsed = JSON.parse(text);
+							const formatted =
+								mode === "pretty"
+									? JSON.stringify(parsed, null, 2)
+									: JSON.stringify(parsed);
+							return {
+								name: copyName(
+									picked.name,
+									mode === "pretty" ? "formatted" : "minified",
+								),
+								bytes: new TextEncoder().encode(formatted),
+								mime: "application/json",
+							};
+						} catch (e) {
+							setError(t("Invalid JSON syntax: ") + String(e));
+							throw e;
+						}
+					})
+				}
+			/>
+		</>
+	);
 }
 
 function OnePdf({
@@ -2052,7 +2321,7 @@ function ProtectTool({ file, onOpen }: ToolProps) {
 				{!same && two
 					? t("The two passwords are not the same")
 					: t(
-							"Keep it somewhere safe: without it the copy cannot be opened. Paperwren does not keep it.",
+							"Keep it somewhere safe: without it the copy cannot be opened. Sark Docs does not keep it.",
 						)}
 			</p>
 			{allows.map(([label, on, set, testId]) => (

@@ -70,7 +70,7 @@ function whereabouts(file: FileRef): string {
 		case "path":
 			return file.reopen.path;
 		case "managed":
-			return t("A private copy kept by Paperwren");
+			return t("A private copy kept by Sark Docs");
 		case "uri":
 			return t("Provided by another app");
 		case "memory":

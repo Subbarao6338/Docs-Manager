@@ -207,7 +207,7 @@ export function Home({
 	const browse = () => {
 		if (folders.length >= MAX_FOLDERS) {
 			toast(
-				t("Paperwren keeps up to {n} folders. Remove one to add another.", {
+				t("Sark Docs keeps up to {n} folders. Remove one to add another.", {
 					n: MAX_FOLDERS,
 				}),
 			);
@@ -529,7 +529,7 @@ export function Home({
 									samplePdf()
 										.then((bytes) =>
 											onOpenRequest(
-												requestForBytes("Welcome to Paperwren.pdf", bytes),
+												requestForBytes("Welcome to Sark Docs.pdf", bytes),
 											),
 										)
 										.catch(() => {});

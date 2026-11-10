@@ -6,7 +6,8 @@ import { locale, t } from "@/lib/i18n";
 import { type Chart, readChart } from "@/lib/pptx/chart";
 import { hintFor } from "@/lib/shortcuts";
 
-import { CellStore } from "@/lib/cellPack";
+import { CellStore, packCells } from "@/lib/cellPack";
+import type { GridCell } from "@/lib/workbookModel";
 import type { PackedParseResult } from "@/lib/parseWorker";
 import {
 	DEFAULT_COL_WIDTH,
@@ -194,6 +195,74 @@ export default function SheetView({
 	useEffect(() => {
 		const abort = new AbortController();
 		let urls: string[] = [];
+		if (fileFormat === "parquet") {
+			import("hyparquet")
+				.then(({ parquetRead }) => {
+					const headers: string[] = [];
+					parquetRead({
+						file: data,
+						onChunk: (chunk) => {
+							if (!headers.includes(chunk.columnName)) {
+								headers.push(chunk.columnName);
+							}
+						},
+						onComplete: (parsedRows: unknown[][]) => {
+							const colCount = Math.max(headers.length, 1);
+							const rowCount = parsedRows.length + 1; // 1 header row + data rows
+							const widths = new Array(colCount).fill(120);
+							const rowHeights = new Array(rowCount).fill(24);
+							const rowPrefix = [0];
+							for (let r = 0; r < rowCount; r++) {
+								rowPrefix.push(rowPrefix[r] + rowHeights[r]);
+							}
+							const cells: Array<[number, number, GridCell]> = [];
+							headers.forEach((h, c) => {
+								cells.push([c, 0, { value: String(h) }]);
+							});
+							parsedRows.forEach((row, r) => {
+								row.forEach((val, c) => {
+									if (val !== undefined && val !== null) {
+										cells.push([
+											c,
+											r + 1,
+											{
+												value: String(val),
+											},
+										]);
+									}
+								});
+							});
+							const packed = packCells(cells);
+							const store = new CellStore(packed);
+							const sheetObj: Sheet = {
+								name: "Data",
+								cols: colCount,
+								rows: rowCount,
+								widths,
+								rowHeights,
+								rowPrefix,
+								cells: store,
+								merges: [],
+								rowOrigins: Array.from({ length: rowCount }, (_, i) => i),
+								colOrigins: Array.from({ length: colCount }, (_, i) => i),
+							};
+							setSheets([sheetObj]);
+							setGridShown({ 0: true });
+							setStyles([]);
+						},
+					}).catch(() => {
+						setError(
+							t("The file is damaged or uses a variant Sark Docs can't read."),
+						);
+					});
+				})
+				.catch((err) => {
+					setError(String(err));
+				});
+			return () => {
+				abort.abort();
+			};
+		}
 		const input = fileFormat === "csv" ? decodeText(data, encoding) : data;
 		runWorker<PackedParseResult>(
 			{ type: "workbook", buffer: input },

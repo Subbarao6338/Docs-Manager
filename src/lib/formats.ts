@@ -17,6 +17,7 @@ export type FileFormat =
 	| "xls"
 	| "ods"
 	| "csv"
+	| "parquet"
 	| "pptx"
 	| "ppt"
 	| "odp"
@@ -47,6 +48,7 @@ export const ALL_FORMATS: FileFormat[] = [
 	"xls",
 	"ods",
 	"csv",
+	"parquet",
 	"pptx",
 	"ppt",
 	"odp",
@@ -146,6 +148,8 @@ const EXTENSIONS: Record<string, FileFormat> = {
 	ods: "ods",
 	csv: "csv",
 	tsv: "csv",
+	parquet: "parquet",
+	pq: "parquet",
 	pptx: "pptx",
 	pptm: "pptx",
 	ppsx: "pptx",
@@ -153,6 +157,7 @@ const EXTENSIONS: Record<string, FileFormat> = {
 	pps: "ppt",
 	odp: "odp",
 	md: "md",
+	mdx: "md",
 	markdown: "md",
 	txt: "txt",
 	text: "txt",
@@ -204,6 +209,7 @@ export function kindOf(format: FileFormat): FormatKind {
 		case "xls":
 		case "ods":
 		case "csv":
+		case "parquet":
 			return "sheet";
 		case "pptx":
 		case "ppt":
@@ -313,6 +319,7 @@ const MIME: Record<FileFormat, string> = {
 	xls: "application/vnd.ms-excel",
 	ods: "application/vnd.oasis.opendocument.spreadsheet",
 	csv: "text/csv",
+	parquet: "application/vnd.apache.parquet",
 	pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 	ppt: "application/vnd.ms-powerpoint",
 	odp: "application/vnd.oasis.opendocument.presentation",

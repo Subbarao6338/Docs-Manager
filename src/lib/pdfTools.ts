@@ -384,7 +384,7 @@ export async function imagesToPdf(
 }
 
 /** The words a scan carries at its foot, unless the reader takes them off. */
-export const SCAN_MARK = "Scanned with Paperwren";
+export const SCAN_MARK = "Scanned with Sark Docs";
 
 /**
  * Scanned pages as a PDF: each page filled by its picture. "fit" gives
@@ -402,8 +402,8 @@ export async function scansToPdf(
 	if (!pages.length) throw new ToolError("empty");
 	const { PDFDocument, StandardFonts } = await lib();
 	const doc = await PDFDocument.create();
-	doc.setCreator("Paperwren");
-	doc.setProducer("Paperwren");
+	doc.setCreator("Sark Docs");
+	doc.setProducer("Sark Docs");
 	const font = mark ? await doc.embedFont(StandardFonts.Helvetica) : null;
 	const grey = await rgbOf("#6f6c66");
 	for (const scan of pages) {

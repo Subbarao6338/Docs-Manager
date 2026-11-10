@@ -226,6 +226,8 @@ export function sniffFormat(buffer: ArrayBuffer, nameHint = ""): FileFormat {
 
 	// %PDF may be preceded by junk; the spec tolerates 1 KB of it.
 	if (latin1.decode(head).includes("%PDF-")) return "pdf";
+	// Parquet file format starts with magic bytes 'PAR1'
+	if (startsWith(bytes, [0x50, 0x41, 0x52, 0x31])) return "parquet";
 	if (startsWith(bytes, [0x50, 0x4b, 0x03, 0x04])) return zipFamily(bytes);
 	if (startsWith(bytes, OLE_MAGIC)) return oleFamily(bytes);
 	if (latin1.decode(head.subarray(0, 5)) === "{\\rtf") return "rtf";
@@ -234,6 +236,7 @@ export function sniffFormat(buffer: ArrayBuffer, nameHint = ""): FileFormat {
 	const utf16 =
 		startsWith(bytes, [0xff, 0xfe]) || startsWith(bytes, [0xfe, 0xff]);
 	if (!utf16 && !looksLikeText(head)) return "unknown";
-	if (hinted === "csv" || hinted === "md") return hinted;
+	if (hinted === "csv" || hinted === "md" || hinted === "parquet")
+		return hinted;
 	return "txt";
 }

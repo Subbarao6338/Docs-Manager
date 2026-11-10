@@ -83,7 +83,7 @@ export function NotesScreen() {
 		setMenu(false);
 		try {
 			const saved = await backend.saveFile(
-				"Paperwren notes.json",
+				"Sark Docs notes.json",
 				await backupNotes(),
 				"application/json",
 			);
@@ -101,7 +101,7 @@ export function NotesScreen() {
 			if (!picked) return;
 			const added = await restoreNotes(await backend.read(picked.reopen));
 			if (added === null) {
-				toast(t("This isn't a Paperwren notes backup"));
+				toast(t("This isn't a Sark Docs notes backup"));
 				return;
 			}
 			setNotes(await loadNotes());

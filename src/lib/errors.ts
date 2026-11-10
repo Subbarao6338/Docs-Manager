@@ -132,7 +132,7 @@ export function failureCopy(failure: OpenFailure, name: string): FailureCopy {
 			return {
 				title: t("Access expired"),
 				message: t(
-					"Paperwren no longer has access to {file}. Choose it again to restore access.",
+					"Sark Docs no longer has access to {file}. Choose it again to restore access.",
 					{ file },
 				),
 				action: "locate",
@@ -165,7 +165,7 @@ export function failureCopy(failure: OpenFailure, name: string): FailureCopy {
 			return {
 				title: t("Unsupported file"),
 				message: t(
-					"Paperwren opens PDF, Word, Excel, PowerPoint, OpenDocument, RTF, EPUB, CSV, Markdown and text files, comic books, pictures and source code.",
+					"Sark Docs opens PDF, Word, Excel, PowerPoint, OpenDocument, RTF, EPUB, CSV, Markdown, Parquet, and text files, comic books, pictures and source code.",
 				),
 				action: null,
 			};
@@ -173,7 +173,7 @@ export function failureCopy(failure: OpenFailure, name: string): FailureCopy {
 			return {
 				title: t("Can't unlock this file"),
 				message: t(
-					"{file} is protected in a way Paperwren can't open (a certificate or rights management, not a password).",
+					"{file} is protected in a way Sark Docs can't open (a certificate or rights management, not a password).",
 					{ file },
 				),
 				action: null,
